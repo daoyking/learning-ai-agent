@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>金道洋 · 前端开发工程师 简历</title>
+<style>
+  :root{
+    --navy:#1E2A47;
+    --navy-2:#243152;
+    --accent:#4F8CFF;
+    --accent-2:#2F6BFF;
+    --accent-soft:#EAF1FF;
+    --s-text:#EAF0FB;
+    --s-muted:#9FB0CE;
+    --ink:#1F2733;
+    --ink-2:#566073;
+    --line:#EDF1F6;
+    --chip-bg:#EAF1FF;
+    --chip-text:#2563EB;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  html,body{background:#EEF1F6;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC","Noto Sans SC",-apple-system,system-ui,sans-serif;
+    color:var(--ink);
+    font-size:11px;
+    line-height:1.4;
+    -webkit-font-smoothing:antialiased;
+    padding:16px 12px;
+  }
+  .resume{
+    width:760px;
+    margin:0 auto;
+    display:flex;
+    background:#fff;
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow:0 14px 40px rgba(20,30,60,.16);
+  }
+  /* ===== Sidebar ===== */
+  .sidebar{
+    width:200px;
+    flex:0 0 200px;
+    background:linear-gradient(180deg,var(--navy) 0%,var(--navy-2) 100%);
+    color:var(--s-text);
+    padding:20px 14px 22px;
+  }
+  .avatar{
+    width:72px;height:72px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent) 0%,#7AA8FF 100%);
+    display:flex;align-items:center;justify-content:center;
+    font-size:32px;font-weight:700;color:#fff;
+    margin:0 auto 11px;
+    box-shadow:0 6px 16px rgba(79,140,255,.45);
+    letter-spacing:2px;
+  }
+  .name{text-align:center;font-size:22px;font-weight:700;letter-spacing:2px;color:#fff;}
+  .role{text-align:center;font-size:12px;color:var(--accent);font-weight:600;margin-top:4px;letter-spacing:1px;}
+  .s-divider{height:1px;background:rgba(255,255,255,.12);margin:15px 0 12px;}
+  .contact-item{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:10.5px;color:var(--s-text);word-break:break-all;}
+  .contact-item svg{flex:0 0 14px;color:var(--accent);}
+  .s-section{margin-top:16px;}
+  .s-label{font-size:10px;font-weight:700;letter-spacing:3px;color:#fff;display:flex;align-items:center;gap:7px;margin-bottom:9px;}
+  .s-label::before{content:"";width:4px;height:12px;border-radius:2px;background:var(--accent);display:inline-block;}
+  .skill-group{margin-bottom:8px;}
+  .skill-group .g-title{font-size:10px;color:var(--s-muted);margin-bottom:5px;font-weight:600;}
+  .chips{display:flex;flex-wrap:wrap;gap:4px;}
+  .chip{background:rgba(79,140,255,.16);border:1px solid rgba(122,168,255,.35);color:#DCE8FF;font-size:9.5px;padding:2px 6px;border-radius:5px;line-height:1.4;}
+  .s-note{margin-top:14px;font-size:10px;color:var(--s-muted);line-height:1.6;border-top:1px solid rgba(255,255,255,.1);padding-top:10px;}
+  /* ===== Main ===== */
+  .main{flex:1;padding:16px 18px 16px;min-width:0;}
+  .section{margin-bottom:12px;}
+  .section:last-child{margin-bottom:0;}
+  .sec-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--line);}
+  .sec-bar{width:4px;height:14px;border-radius:3px;background:var(--accent);}
+  .sec-title{font-size:13.5px;font-weight:700;color:var(--ink);letter-spacing:1px;}
+  .sec-en{font-size:9.5px;color:#A9B2C2;letter-spacing:2px;font-weight:600;margin-left:2px;}
+  .item{margin-bottom:7px;}
+  .item:last-child{margin-bottom:0;}
+  .item-head{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .item-head-l{display:flex;align-items:center;gap:8px;min-width:0;}
+  .item-title{font-size:12.5px;font-weight:700;color:var(--ink);}
+  .item-meta{font-size:10.5px;color:var(--accent-2);font-weight:600;white-space:nowrap;}
+  .item-sub{font-size:10.5px;color:var(--ink-2);margin-top:1px;}
+  .lead{font-size:10.5px;color:var(--ink-2);line-height:1.45;margin:2px 0 3px;}
+  ul.bullets{margin:3px 0 0;padding-left:16px;}
+  ul.bullets li{font-size:10.5px;color:var(--ink-2);line-height:1.45;margin-bottom:1px;}
+  .achieve{font-size:10px;color:var(--accent-2);font-weight:600;margin-top:2px;display:flex;align-items:flex-start;gap:5px;}
+  .achieve::before{content:"★";font-size:9px;line-height:1.6;}
+  /* ===== 个人优势卡片 ===== */
+  .adv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px;}
+  .adv-card{background:#F7F9FC;border:1px solid var(--line);border-radius:8px;padding:8px 9px 6px;position:relative;}
+  .adv-card.wide{grid-column:1 / -1;}
+  .adv-num{position:absolute;top:-7px;left:9px;width:17px;height:17px;border-radius:5px;background:linear-gradient(135deg,var(--accent) 0%,#7AA8FF 100%);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(79,140,255,.4);}
+  .adv-title{font-size:11px;font-weight:700;color:var(--ink);margin:2px 0 3px;letter-spacing:.3px;}
+  .adv-desc{font-size:10px;color:var(--ink-2);line-height:1.4;}
+  .adv-desc b{color:var(--accent-2);font-weight:700;}
+  /* ===== 技术栈 ===== */
+  .tech-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:3px 0 2px;}
+  .tech-label{font-size:9px;font-weight:700;color:var(--accent-2);background:var(--accent-soft);padding:1px 5px;border-radius:4px;letter-spacing:.5px;flex:0 0 auto;}
+  .tech-chip{font-size:9px;color:#3A4A66;background:#F0F3F8;border:1px solid #E2E8F2;padding:1px 5px;border-radius:4px;line-height:1.4;}
+  /* ===== 教育 ===== */
+  .edu-item{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .edu-item:last-child{border-bottom:none;}
+  .edu-name{font-size:11.5px;font-weight:700;color:var(--ink);}
+  .edu-sub{font-size:10.5px;color:var(--ink-2);margin-top:1px;}
+  .edu-year{font-size:10.5px;color:var(--accent-2);font-weight:600;white-space:nowrap;}
+  /* ===== Print ===== */
+  @media print{
+    html,body{background:#fff;padding:0;}
+    .resume{width:100%;border-radius:0;box-shadow:none;margin:0;}
+    .item,.adv-card,.edu-item,.section{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+  <div class="resume">
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+      <div class="avatar">金</div>
+      <div class="name">金道洋</div>
+      <div class="role">前端开发工程师</div>
+
+      <div class="s-divider"></div>
+
+      <div class="contact-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span>18898355832</span>
+      </div>
+      <div class="contact-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+        <span>Jindy0706@gmail.com</span>
+      </div>
+      <div class="contact-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span>期望城市：武汉</span>
+      </div>
+      <div class="contact-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 12 0v1"/></svg>
+        <span>男 · 33岁 · 籍贯黄石</span>
+      </div>
+      <div class="contact-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        <span>10 年工作经验</span>
+      </div>
+
+      <div class="s-section">
+        <div class="s-label">专业技能</div>
+
+        <div class="skill-group">
+          <div class="g-title">基础技术</div>
+          <div class="chips">
+            <span class="chip">HTML5</span><span class="chip">CSS3</span><span class="chip">JS / ES6+</span><span class="chip">Sass / Less</span><span class="chip">响应式布局</span><span class="chip">移动端 H5</span><span class="chip">浏览器兼容</span>
+          </div>
+        </div>
+        <div class="skill-group">
+          <div class="g-title">主流框架</div>
+          <div class="chips">
+            <span class="chip">Vue2 / Vue3 全家桶</span><span class="chip">React</span><span class="chip">Angular 基础</span><span class="chip">jQuery</span><span class="chip">Zepto</span>
+          </div>
+        </div>
+        <div class="skill-group">
+          <div class="g-title">工程化与构建</div>
+          <div class="chips">
+            <span class="chip">Webpack</span><span class="chip">Vite</span><span class="chip">Gzip</span><span class="chip">Tree Shaking</span><span class="chip">Axios</span><span class="chip">Git / SVN</span><span class="chip">Jenkins</span><span class="chip">Postman</span>
+          </div>
+        </div>
+        <div class="skill-group">
+          <div class="g-title">进阶能力</div>
+          <div class="chips">
+            <span class="chip">RESTful 封装</span><span class="chip">全局请求拦截</span><span class="chip">动态权限路由</span><span class="chip">qiankun 微前端</span><span class="chip">大数据虚拟滚动</span><span class="chip">性能专项优化</span><span class="chip">低代码（牛刀）</span>
+          </div>
+        </div>
+        <div class="skill-group">
+          <div class="g-title">其他</div>
+          <div class="chips">
+            <span class="chip">Node.js</span><span class="chip">ECharts</span><span class="chip">Swiper</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="s-note">
+        求职意向：前端开发工程师<br>
+        可接受城市：武汉<br>
+        状态：积极看机会中
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="main">
+      <!-- 个人优势 -->
+      <section class="section">
+        <div class="sec-head">
+          <span class="sec-bar"></span>
+          <span class="sec-title">个人优势</span>
+          <span class="sec-en">PROFILE</span>
+        </div>
+        <div class="adv-grid">
+          <div class="adv-card">
+            <span class="adv-num">01</span>
+            <div class="adv-title">全流程主导能力</div>
+            <div class="adv-desc">拥有 <b>10 年</b>一线 Web 前端全流程开发实战经验，独立主导多个商业化大型项目完整生命周期开发。</div>
+          </div>
+          <div class="adv-card">
+            <span class="adv-num">02</span>
+            <div class="adv-title">主流框架精通</div>
+            <div class="adv-desc">精通 <b>Vue / React</b>，熟悉 Angular，可根据业务场景灵活选型，快速学习并落地新技术。</div>
+          </div>
+          <div class="adv-card">
+            <span class="adv-num">03</span>
+            <div class="adv-title">独立攻坚 · 抗压</div>
+            <div class="adv-desc">擅长独立排查复杂业务场景技术难题，按期交付紧急攻坚项目，<b>疑难 bug</b> 与线上故障处理经验丰富。</div>
+          </div>
+          <div class="adv-card">
+            <span class="adv-num">04</span>
+            <div class="adv-title">跨团队高效协同</div>
+            <div class="adv-desc">长期协同 <b>产品、UI、后端、测试</b> 多部门跨团队协作，高效推进需求评审、接口联调、版本上线全流程。</div>
+          </div>
+          <div class="adv-card wide">
+            <span class="adv-num">05</span>
+            <div class="adv-title">工程化与代码质量</div>
+            <div class="adv-desc">重视代码可维护性与页面性能，常态化开展 <b>代码审查、单元测试</b>，持续优化团队整体代码质量。</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 工作经历 -->
+      <section class="section">
+        <div class="sec-head">
+          <span class="sec-bar"></span>
+          <span class="sec-title">工作经历</span>
+          <span class="sec-en">EXPERIENCE</span>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="item-title">厦门方胜众合企业服务有限公司（深圳分公司）</span>
+            </div>
+            <span class="item-meta">2022.03 - 2025.07</span>
+          </div>
+          <div class="item-sub">前端开发工程师</div>
+          <ul class="bullets">
+            <li>根据产品需求与 UI 设计稿独立完成全页面开发，使用 HTML5 / CSS3 / JS 实现响应式布局与复杂交互，保障 PC、移动端多设备兼容与页面性能稳定。</li>
+            <li>对接后端 API 文档完成接口联调，基于 Axios 封装异步请求，开展系统性能优化与代码重构，整体页面加载速度提升 30%。</li>
+            <li>修复历史遗留浏览器兼容问题，完成 IE11 及低版本浏览器适配改造，保障平台核心业务在全主流浏览器正常运行。</li>
+          </ul>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="item-title">深圳市云客派科技有限公司</span>
+            </div>
+            <span class="item-meta">2020.05 - 2021.12</span>
+          </div>
+          <div class="item-sub">Web 前端</div>
+          <ul class="bullets">
+            <li>独立承接前端开发需求，按时高质量交付项目，客户整体满意度达 95% 以上；协同后端完成接口联调与功能测试，团队前后端协作效率提升 30%。</li>
+            <li>统筹版本迭代与上线流程，引入自动化部署工具，代码上线耗时缩短 20%，建立线上问题快速定位机制。</li>
+            <li>推行组件化开发模式，通用代码复用率提升 40%；持续做页面性能迭代，页面加载速度提升 15%。</li>
+            <li>参与客户需求评审，独立完成项目基础技术框架搭建，全程配合后端接口联调与功能自测，把控交付质量与用户体验。</li>
+          </ul>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="item-title">深圳市思迪信息技术股份有限公司</span>
+            </div>
+            <span class="item-meta">2016.06 - 2020.05</span>
+          </div>
+          <div class="item-sub">Web 前端</div>
+          <ul class="bullets">
+            <li>依据客户需求独立完成 PC、App、H5 页面开发、功能迭代与线上性能优化，严格匹配业务预期效果。</li>
+            <li>配合后端完成各类业务场景接口联调，保障系统稳定、数据准确；负责项目版本发布全流程，及时处理上线期间突发故障。</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 项目经历 -->
+      <section class="section">
+        <div class="sec-head">
+          <span class="sec-bar"></span>
+          <span class="sec-title">项目经历</span>
+          <span class="sec-en">PROJECTS</span>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="proj-index">01</span>
+              <span class="item-title">合约系统（建筑支出管控平台）</span>
+            </div>
+            <span class="item-meta">2024.07 - 2025.06</span>
+          </div>
+          <div class="item-sub">前端开发</div>
+          <div class="tech-row">
+            <span class="tech-label">技术栈</span>
+            <span class="tech-chip">Vue3</span>
+            <span class="tech-chip">牛刀低代码</span>
+            <span class="tech-chip">混合开发</span>
+          </div>
+          <p class="lead">面向建筑工程在建 / 未完结地盘的支出管控场景，完成合约系统前端架构重构，打造集粮单、合约、分判商、权限管控于一体的数字化填报平台。</p>
+          <ul class="bullets">
+            <li>独立主导前端全生命周期开发，采用「Vue3 定制化开发 + 低代码快速搭建」混合模式，封装通用业务组件与表单，提升交付效率。</li>
+            <li>负责核心模块开发、性能优化与线上运维，保障多地盘日常支出申报、合约审批全流程稳定运行。</li>
+          </ul>
+          <div class="achieve">项目按期交付，已正式上线运营并持续迭代。</div>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="proj-index">02</span>
+              <span class="item-title">路衍商城 H5</span>
+            </div>
+            <span class="item-meta">2021.11 - 2022.12</span>
+          </div>
+          <div class="item-sub">前端开发</div>
+          <div class="tech-row">
+            <span class="tech-label">技术栈</span>
+            <span class="tech-chip">Vue 全家桶</span>
+          </div>
+          <p class="lead">H5 电商商城，覆盖商品列表、详情、加购、付款、订单查询等完整购物链路。</p>
+          <ul class="bullets">
+            <li>独立负责商城各页面前端开发，实现商品浏览、加购、支付、订单查询等核心流程；对接后端交易接口完成联调，保障交易顺畅与数据一致。</li>
+          </ul>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="proj-index">03</span>
+              <span class="item-title">招商运营平台 / 积分商城</span>
+            </div>
+            <span class="item-meta">2021.04 - 2021.07</span>
+          </div>
+          <div class="item-sub">前端开发</div>
+          <div class="tech-row">
+            <span class="tech-label">技术栈</span>
+            <span class="tech-chip">Vue 全家桶</span>
+            <span class="tech-chip">qiankun</span>
+            <span class="tech-chip">ElementUI</span>
+          </div>
+          <p class="lead">招商运营平台负责插件管理与配置、权限与奖励分配；积分商城插件支持用户在 App / 小程序查看并兑换积分物品。</p>
+          <ul class="bullets">
+            <li>根据原型 / 设计图完成平台页面布局与交互，落地插件管理、权限分配、奖励管理等核心模块。</li>
+            <li>与后端完成接口联调，负责项目维护、代码优化及公共方法封装，提升代码可维护性。</li>
+          </ul>
+          <div class="achieve">已发布运营（未对外开放）。</div>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="proj-index">04</span>
+              <span class="item-title">华泰运营平台</span>
+            </div>
+            <span class="item-meta">2020.11 - 2021.04</span>
+          </div>
+          <div class="item-sub">前端开发</div>
+          <div class="tech-row">
+            <span class="tech-label">技术栈</span>
+            <span class="tech-chip">Vue 全家桶</span>
+            <span class="tech-chip">qiankun</span>
+            <span class="tech-chip">ElementUI</span>
+          </div>
+          <p class="lead">管理平台插件配置、权限分配、审核与奖品发放；同时支持模拟炒股、行情查看、任务奖励等场景。</p>
+          <ul class="bullets">
+            <li>根据设计图完成页面布局及交互，落地插件管理、权限分配、审核与奖品管理等模块。</li>
+            <li>与后端联调，完成项目维护、组件二次封装与工具类编写，并解决多端平台兼容问题。</li>
+          </ul>
+          <div class="achieve">项目已上线。</div>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="proj-index">05</span>
+              <span class="item-title">递四方跨境物流一体化平台（PC + H5）</span>
+            </div>
+            <span class="item-meta">2020.07 - 2020.10</span>
+          </div>
+          <div class="item-sub">前端开发</div>
+          <div class="tech-row">
+            <span class="tech-label">技术栈</span>
+            <span class="tech-chip">ant-design-vue</span>
+            <span class="tech-chip">Vuex</span>
+            <span class="tech-chip">Vue Router</span>
+            <span class="tech-chip">React</span>
+            <span class="tech-chip">飞冰 ICE</span>
+          </div>
+          <p class="lead">集合递四方全部跨境物流业务（转运、退货、海外服务），面向商家提供运单查询、店铺管理、消息接收等一体化综合服务。</p>
+          <ul class="bullets">
+            <li>轨迹中心模块：基于 ant-design-vue + Vuex + Vue Router 完成包裹运输轨迹查询平台的页面布局、交互开发与接口联调（已上线 track.4px.com）。</li>
+            <li>商家中心模块：基于 React + 飞冰 ICE 完成前后端分离重构，负责服务中心与消息中心的页面布局、交互及接口联调（已上线 b.4px.com）。</li>
+          </ul>
+          <div class="achieve">两大模块均稳定上线运营，支撑商家日常运单查询与店铺管理业务。</div>
+        </div>
+
+        <div class="item">
+          <div class="item-head">
+            <div class="item-head-l">
+              <span class="proj-index">06</span>
+              <span class="item-title">金融证券开户 / 交易系统</span>
+            </div>
+            <span class="item-meta">2018.01 - 2020.01</span>
+          </div>
+          <div class="item-sub">前端开发（红塔 / 华安 / 川财 H5 双向开户 · 申万宏源 VTM · 华安徽赢 App）</div>
+          <div class="tech-row">
+            <span class="tech-label">技术栈</span>
+            <span class="tech-chip">Zepto / jQuery</span>
+            <span class="tech-chip">Canvas</span>
+            <span class="tech-chip">HTML5</span>
+            <span class="tech-chip">JS / CSS</span>
+          </div>
+          <p class="lead">覆盖非现场 H5 开户、VTM 智能硬件开户及综合证券 App 开户交易业务。</p>
+          <ul class="bullets">
+            <li>负责与第三方 / 厂商的硬件及接口联调，打通身份认证、视频见证等关键节点。</li>
+            <li>负责页面开发、交互实现、新需求开发及线上问题修复，处理多端浏览器与 App 兼容问题。</li>
+          </ul>
+          <div class="achieve">多项目上线稳定运行，非现场开户系统让用户免临柜、免下载 App 便捷开户。</div>
+        </div>
+      </section>
+
+      <!-- 教育经历 -->
+      <section class="section">
+        <div class="sec-head">
+          <span class="sec-bar"></span>
+          <span class="sec-title">教育经历</span>
+          <span class="sec-en">EDUCATION</span>
+        </div>
+        <div class="edu-item">
+          <div>
+            <div class="edu-name">西南交通大学</div>
+            <div class="edu-sub">本科 · 工商管理</div>
+          </div>
+          <div class="edu-year">2017 - 2022</div>
+        </div>
+        <div class="edu-item">
+          <div>
+            <div class="edu-name">武汉工程大学</div>
+            <div class="edu-sub">大专 · 机电一体化</div>
+          </div>
+          <div class="edu-year">2015 - 2017</div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
