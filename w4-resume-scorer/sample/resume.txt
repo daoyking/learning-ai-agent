@@ -1,0 +1,17 @@
+金道洋 / 前端开发工程师
+
+【技能】
+- 框架：React / Vue / Svelte / SolidJS，熟悉组件化与状态管理
+- 语言：TypeScript / JavaScript，类型系统扎实
+- 工程化：Vite / Webpack，CI/CD，Monorepo
+- 后端：Node.js / Express，能独立完成全栈交付
+- AI：日常使用 WorkBuddy / Claude Code 等 Agent 工具，正在学习 Agent 开发
+
+【项目】
+- 湖北鸿萌官网克隆：Vue3 + Element Plus + Vite 前端，Express5 + node:sqlite 后端，78 款产品数据完整呈现
+- 自生长 Obsidian 知识库：基于 Karpathy LLM Wiki 三层架构，4 项自动化工作流
+- AI HOT 每日资讯仪表盘：单文件 HTML，5 大板块 + 响应式卡片网格
+
+【特点】
+- 重视可运行交付物与作品集
+- 擅长把复杂流程做成清晰的交互界面

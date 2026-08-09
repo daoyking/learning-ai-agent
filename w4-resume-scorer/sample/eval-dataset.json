@@ -1,0 +1,23 @@
+[
+  {
+    "id": "w4-score-1",
+    "input": "请读取我的简历与目标岗位 JD，按 5 个维度打分（每项 0-10），给出总分与最优先的 3 条改进建议。用中文 Markdown 输出。",
+    "context": "多步编排：Agent 应先 readResume 再 readJobDescription，然后逐项打分并给建议。",
+    "criteria": [
+      { "name": "读取简历", "description": "调用了 readResume 工具读取简历", "weight": 2 },
+      { "name": "读取 JD", "description": "调用了 readJobDescription 工具读取岗位要求", "weight": 2 },
+      { "name": "多维度打分", "description": "给出了 5 个维度的分数", "weight": 2 },
+      { "name": "给出改进建议", "description": "给出了至少 3 条改进建议", "weight": 1 }
+    ]
+  },
+  {
+    "id": "w4-score-2",
+    "input": "我的简历在 AI / Agent 经验这一项能打几分？对照 JD 还差什么？",
+    "context": "聚焦单维度评估，Agent 仍应先读取简历与 JD 再评估。",
+    "criteria": [
+      { "name": "读取简历与 JD", "description": "调用了 readResume 与 readJobDescription", "weight": 2 },
+      { "name": "针对 AI 经验评估", "description": "回答应围绕 AI / Agent 实际经验维度展开", "weight": 2 },
+      { "name": "指出差距", "description": "应指出与 JD 的差距或不足", "weight": 1 }
+    ]
+  }
+]

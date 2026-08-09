@@ -1,0 +1,22 @@
+[
+  {
+    "id": "w3-rag-1",
+    "input": "我们知识库里关于 RAG 是怎么说的？请结合文档回答并注明来源。",
+    "context": "RAG 检索问答，Agent 应当调用 retrieve 工具从本地知识库取回片段再作答。",
+    "criteria": [
+      { "name": "调用检索工具", "description": "必须调用 retrieve 工具检索知识库", "weight": 2 },
+      { "name": "引用来源", "description": "回答应注明内容来自知识库文档（文件名/来源）", "weight": 2 },
+      { "name": "答案基于检索", "description": "回答内容应与检索到的片段相关，而非泛泛而谈", "weight": 1 }
+    ]
+  },
+  {
+    "id": "w3-rag-2",
+    "input": "如何在本地搭建一个向量检索？请给出关键步骤。",
+    "context": "知识库应包含向量检索/分块/Embedding 相关内容，Agent 应检索后作答。",
+    "criteria": [
+      { "name": "调用检索工具", "description": "必须调用 retrieve 工具", "weight": 2 },
+      { "name": "覆盖关键步骤", "description": "答案应提及分块 / 向量化(Embedding) / 相似度检索等关键步骤", "weight": 2 },
+      { "name": "有来源标注", "description": "应注明信息来自知识库文档", "weight": 1 }
+    ]
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "calc-1",
+    "input": "帮我算一下 12 * (3 + 4) 等于多少？",
+    "context": "这是一个数学计算问题，Agent 应当调用 calculator 工具。",
+    "criteria": [
+      { "name": "调用工具", "description": "必须调用 calculator 工具完成计算", "weight": 2 },
+      { "name": "结果正确", "description": "最终答案应为 84", "weight": 2 },
+      { "name": "有解释", "description": "答案应包含简要中文说明" }
+    ]
+  },
+  {
+    "id": "rag-1",
+    "input": "请解释一下 RAG 是什么，并说明它为什么能降低幻觉？",
+    "context": "Agent 应当用 searchDocs 检索 RAG 片段后作答。",
+    "criteria": [
+      { "name": "调用检索", "description": "必须调用 searchDocs 工具检索 RAG 资料", "weight": 2 },
+      { "name": "概念准确", "description": "正确说明 RAG 是检索增强生成", "weight": 2 },
+      { "name": "降低幻觉", "description": "提到检索资料可降低幻觉" }
+    ]
+  }
+]

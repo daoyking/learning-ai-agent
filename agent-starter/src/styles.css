@@ -1,0 +1,17 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; background: #0f1115; color: #e6e6e6; }
+.app { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 20px; }
+.messages { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; min-height: 200px; }
+.msg { padding: 12px 14px; border-radius: 10px; }
+.msg.user { background: #1b3a57; align-self: flex-end; max-width: 80%; }
+.msg.assistant { background: #1c1f26; align-self: flex-start; max-width: 85%; }
+.role { font-size: 12px; opacity: 0.6; margin-bottom: 4px; }
+.text { margin: 0; white-space: pre-wrap; line-height: 1.6; }
+.tool { font-size: 13px; background: #232838; border: 1px solid #36406b; border-radius: 8px; padding: 8px 10px; margin-top: 6px; }
+.tool pre { margin: 6px 0 0; font-size: 12px; background: #11131a; padding: 6px 8px; border-radius: 6px; overflow: auto; }
+.hint, .error { font-size: 13px; opacity: 0.7; }
+.error { color: #ff8080; }
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #2a2f3a; background: #15181f; color: #e6e6e6; }
+.input-row button { padding: 10px 18px; border: none; border-radius: 8px; background: #3b82f6; color: #fff; cursor: pointer; }

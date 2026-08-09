@@ -1,0 +1,32 @@
+// evals/run.ts — 用 w5 的 runEval 对 W2 工程做「真实 LLM 评测」
+// 前置：在 w2-agent-chat/.env 填好 key（OPENAI_API_KEY / OPENAI_BASE_URL / AI_MODEL）
+// 运行：npm run eval  → 产出 eval-report.md
+
+import { writeFileSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { runEval, llmJudge } from '../../w5-agent-eval/src/runEval.js';
+import type { EvalCase } from '../../w5-agent-eval/src/dataset.js';
+import { agent } from './agent.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const dataset = JSON.parse(
+  readFileSync(join(here, '..', 'sample', 'eval-dataset.json'), 'utf8'),
+) as EvalCase[];
+
+const report = await runEval(llmJudge, agent, dataset);
+
+const md =
+  `# W2 Agent 评测报告\n\n` +
+  `- 用例数：${report.total}\n- 通过率：${(report.passRate * 100).toFixed(0)}%\n- 加权均分：${report.weightedScore}/10\n\n` +
+  report.cases
+    .map(
+      (c) =>
+        `### ${c.id} · 得分 ${c.caseScore} ${c.passed ? '✅' : '❌'}\n` +
+        c.criteria.map((x) => `- ${x.name}: ${x.score}/10 ${x.passed ? '✅' : '❌'} — ${x.reasoning}`).join('\n'),
+    )
+    .join('\n\n') +
+  `\n\n${report.trace}\n`;
+
+writeFileSync(join(here, '..', 'eval-report.md'), md);
+console.log(md);

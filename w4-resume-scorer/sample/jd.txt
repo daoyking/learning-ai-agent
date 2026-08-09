@@ -1,0 +1,15 @@
+【岗位】AI 应用工程师 / 前端 + Agent 方向
+
+【职责】
+1. 基于大语言模型（LLM）构建 AI 应用与智能体（Agent）
+2. 实现工具调用（Function Calling）、多步编排与工作流
+3. 开发流式对话界面，可视化 Agent 思考与工具调用过程
+4. 对接向量数据库，实现 RAG 检索增强问答
+5. 负责前端交互与全栈交付
+
+【要求】
+- 精通 React / TypeScript，有组件化与状态管理经验
+- 熟悉 Node.js / Express 后端开发
+- 了解 LLM API 调用、Prompt Engineering、Agent 框架（LangGraph / Mastra 等）
+- 了解 RAG 与向量检索者优先
+- 有可演示的 AI 应用作品集者优先

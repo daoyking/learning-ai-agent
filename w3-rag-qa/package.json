@@ -1,0 +1,36 @@
+{
+  "name": "w3-rag-qa",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,client \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "tsx server/index.ts",
+    "eval": "tsx evals/run.ts",
+    "test": "node --import tsx --test tests/eval.test.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4",
+    "@ai-sdk/react": "^4",
+    "ai": "^7",
+    "dotenv": "^16",
+    "express": "^4",
+    "react": "^18",
+    "react-dom": "^18",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/express": "^4",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^4",
+    "concurrently": "^9",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vite": "^5"
+  }
+}

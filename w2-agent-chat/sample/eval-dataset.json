@@ -1,0 +1,32 @@
+[
+  {
+    "id": "w2-calc-1",
+    "input": "帮我算一下 12 * (3 + 4) 等于多少？",
+    "context": "数学计算问题，Agent 应当调用 calculator 工具。",
+    "criteria": [
+      { "name": "调用计算器工具", "description": "必须调用 calculator 工具完成计算", "weight": 2 },
+      { "name": "结果正确", "description": "最终答案应为 84", "weight": 2 },
+      { "name": "有解释", "description": "答案应包含简要中文说明", "weight": 1 }
+    ]
+  },
+  {
+    "id": "w2-weather-1",
+    "input": "北京现在天气怎么样？",
+    "context": "天气查询问题，Agent 应当调用 getWeather 真实工具。",
+    "criteria": [
+      { "name": "调用天气工具", "description": "必须调用 getWeather 工具查询天气", "weight": 2 },
+      { "name": "返回天气信息", "description": "返回内容应包含天气状况或温度", "weight": 2 },
+      { "name": "提及城市", "description": "回答中应明确提到「北京」", "weight": 1 }
+    ]
+  },
+  {
+    "id": "w2-readfile-1",
+    "input": "读一下 agent-guide.md 并总结 3 个要点。",
+    "context": "文件读取问题，Agent 应当调用 readFile 工具读取 server/docs/agent-guide.md。",
+    "criteria": [
+      { "name": "调用读文件工具", "description": "必须调用 readFile 工具读取文档", "weight": 2 },
+      { "name": "返回文档内容", "description": "返回内容应非空且来自该文档", "weight": 2 },
+      { "name": "给出总结", "description": "应基于文档内容给出要点总结", "weight": 1 }
+    ]
+  }
+]

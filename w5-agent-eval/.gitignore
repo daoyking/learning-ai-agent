@@ -1,0 +1,5 @@
+node_modules
+.env
+eval-report.md
+dist
+*.log
