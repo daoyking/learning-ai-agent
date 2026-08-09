@@ -1,4 +1,3 @@
-import { writeFileSync } from 'node:fs';
 import { runAgent, type AgentRun } from './agent.js';
 import { llmJudge, type JudgeFn, type CriterionResult } from './judge.js';
 import { tracer } from './trace.js';
@@ -75,10 +74,9 @@ export async function runEval(
   };
 }
 
-// CLI：tsx src/runEval.ts  → 跑真实 LLM 评测并写出 eval-report.md
-if (process.argv[1]?.endsWith('runEval.ts')) {
-  const report = await runEval();
-  const md =
+// 把评测结果渲染成 Markdown 报告（CLI 与离线生成脚本共用）
+export function renderEvalReport(report: EvalReport): string {
+  return (
     `# Eval 报告\n\n` +
     `- 用例数：${report.total}\n- 通过率：${(report.passRate * 100).toFixed(0)}%\n- 加权均分：${report.weightedScore}/10\n\n` +
     report.cases
@@ -88,7 +86,8 @@ if (process.argv[1]?.endsWith('runEval.ts')) {
           c.criteria.map((x) => `- ${x.name}: ${x.score}/10 ${x.passed ? '✅' : '❌'} — ${x.reasoning}`).join('\n'),
       )
       .join('\n\n') +
-    `\n\n${report.trace}\n`;
-  writeFileSync('eval-report.md', md);
-  console.log(md);
+    `\n\n${report.trace}\n`
+  );
 }
+
+// CLI 入口独立文件 src/cli.ts，避免顶层 await 影响 runEval 被其他模块 import

@@ -7,7 +7,7 @@
   "scripts": {
     "start": "tsx index.ts",
     "demo": "tsx src/demo.ts",
-    "eval": "tsx src/runEval.ts",
+    "eval": "tsx src/cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
