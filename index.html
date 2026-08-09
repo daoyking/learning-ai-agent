@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>金道洋 · AI Agent 应用开发作品集</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --bg-soft: #ffffff;
+    --bg-card: #ffffff;
+    --text: #1a1d24;
+    --text-soft: #5a6373;
+    --text-faint: #8a93a3;
+    --border: #e6e9ef;
+    --accent: #4f46e5;
+    --accent-soft: #eef0fe;
+    --accent-2: #0ea5a4;
+    --accent-2-soft: #e3f7f6;
+    --shadow: 0 1px 3px rgba(20, 24, 40, .06), 0 8px 28px rgba(20, 24, 40, .06);
+    --radius: 16px;
+    --maxw: 1080px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  html[data-theme="dark"] {
+    --bg: #0e1117;
+    --bg-soft: #161b22;
+    --bg-card: #161b22;
+    --text: #e6e9ef;
+    --text-soft: #aab2c0;
+    --text-faint: #6e7787;
+    --border: #262d39;
+    --accent: #818cf8;
+    --accent-soft: #1e2138;
+    --accent-2: #2dd4bf;
+    --accent-2-soft: #11271f;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    transition: background .3s, color .3s;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* NAV */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: saturate(180%) blur(12px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .nav-brand { font-weight: 700; letter-spacing: .2px; font-size: 15px; }
+  .nav-brand span { color: var(--accent); }
+  .nav-links { display: flex; gap: 26px; align-items: center; }
+  .nav-links a { font-size: 14px; color: var(--text-soft); transition: color .2s; }
+  .nav-links a:hover, .nav-links a.active { color: var(--text); }
+  .nav-links a.active { color: var(--accent); }
+  .theme-btn {
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--text-soft);
+    width: 34px; height: 34px; border-radius: 9px; cursor: pointer; font-size: 15px;
+    display: grid; place-items: center; transition: .2s;
+  }
+  .theme-btn:hover { color: var(--text); border-color: var(--accent); }
+  @media (max-width: 720px) { .nav-links a:not(.theme-wrap) { display: none; } }
+
+  /* HERO */
+  .hero { padding: 92px 0 72px; position: relative; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: -40% -10% auto -10%; height: 460px;
+    background: radial-gradient(60% 100% at 50% 0%, var(--accent-soft), transparent 70%);
+    opacity: .9; pointer-events: none;
+  }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--accent);
+    background: var(--accent-soft); padding: 6px 13px; border-radius: 999px; font-weight: 600;
+    margin-bottom: 22px;
+  }
+  .hero h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.12; letter-spacing: -.5px; font-weight: 800; }
+  .hero h1 .grad {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lede { margin-top: 20px; font-size: clamp(16px, 2vw, 19px); color: var(--text-soft); max-width: 680px; }
+  .hero-cta { margin-top: 34px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 11px;
+    font-size: 15px; font-weight: 600; cursor: pointer; transition: transform .15s, box-shadow .2s, background .2s;
+    border: 1px solid var(--border);
+  }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 8px 22px -8px var(--accent); }
+  .btn-primary:hover { transform: translateY(-2px); }
+  .btn-ghost { background: var(--bg-card); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .hero-stats { margin-top: 46px; display: flex; gap: 38px; flex-wrap: wrap; }
+  .stat .n { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+  .stat .n .u { font-size: 16px; color: var(--text-faint); font-weight: 600; margin-left: 2px; }
+  .stat .l { font-size: 13px; color: var(--text-faint); margin-top: 2px; }
+
+  /* SECTION */
+  section { padding: 64px 0; }
+  .sec-head { margin-bottom: 38px; }
+  .sec-tag { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: 1.5px; text-transform: uppercase; }
+  .sec-head h2 { font-size: clamp(24px, 3.4vw, 34px); font-weight: 800; letter-spacing: -.4px; margin-top: 8px; }
+  .sec-head p { color: var(--text-soft); margin-top: 10px; max-width: 660px; font-size: 15.5px; }
+
+  /* TIMELINE */
+  .timeline { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  @media (max-width: 860px) { .timeline { grid-template-columns: repeat(2, 1fr); } }
+  .tl-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 16px; box-shadow: var(--shadow); transition: transform .2s, border-color .2s;
+  }
+  .tl-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .tl-week { font-size: 12px; font-weight: 700; color: var(--accent); }
+  .tl-card h3 { font-size: 15.5px; margin: 6px 0 8px; }
+  .tl-card p { font-size: 13px; color: var(--text-soft); }
+  .tl-card.done { border-left: 3px solid var(--accent); }
+  .tl-card.current { border-left: 3px solid var(--accent-2); box-shadow: 0 0 0 3px var(--accent-2-soft); }
+
+  /* PROJECTS */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 26px; box-shadow: var(--shadow); transition: transform .2s, border-color .2s;
+    display: flex; flex-direction: column;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .badge { font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .badge.green { background: var(--accent-2-soft); color: var(--accent-2); }
+  .card h3 { font-size: 19px; font-weight: 750; letter-spacing: -.2px; }
+  .card .pitch { color: var(--text-soft); font-size: 14.5px; margin: 10px 0 16px; flex: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+  .tag { font-size: 12px; color: var(--text-soft); background: var(--bg); border: 1px solid var(--border); padding: 4px 10px; border-radius: 8px; }
+  .card-foot { display: flex; gap: 16px; align-items: center; border-top: 1px solid var(--border); padding-top: 14px; }
+  .card-foot a { font-size: 13.5px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 5px; }
+  .card-foot a:hover { text-decoration: underline; }
+  .card-foot .run { font-family: var(--mono); font-size: 12px; color: var(--text-faint); }
+
+  /* PRACTICE */
+  .practice { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 760px) { .practice { grid-template-columns: 1fr; } }
+  .prac-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow); }
+  .prac-card .ic { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 20px; margin-bottom: 14px; }
+  .prac-card.green .ic { background: var(--accent-2-soft); color: var(--accent-2); }
+  .prac-card h3 { font-size: 18px; font-weight: 750; }
+  .prac-card p { color: var(--text-soft); font-size: 14.5px; margin-top: 8px; }
+  .prac-card ul { margin: 14px 0 0; padding-left: 18px; color: var(--text-soft); font-size: 14px; }
+  .prac-card li { margin: 6px 0; }
+  .prac-card code { font-family: var(--mono); font-size: 12.5px; background: var(--bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: var(--accent); }
+
+  /* DEMO / SCREENCAST */
+  .demo-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 30px; box-shadow: var(--shadow); }
+  .steps { counter-reset: s; display: grid; gap: 14px; margin-top: 8px; }
+  .step { display: flex; gap: 16px; align-items: flex-start; }
+  .step .num { counter-increment: s; flex: 0 0 30px; height: 30px; border-radius: 9px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .step .num::before { content: counter(s); }
+  .step .body h4 { font-size: 15.5px; }
+  .step .body p { color: var(--text-soft); font-size: 14px; margin-top: 3px; }
+  .step .body code { font-family: var(--mono); font-size: 12.5px; background: var(--bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; }
+
+  /* FOOTER */
+  footer { border-top: 1px solid var(--border); padding: 40px 0; color: var(--text-faint); }
+  .foot-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .foot-links { display: flex; gap: 20px; }
+  .foot-links a { font-size: 14px; color: var(--text-soft); }
+  .foot-links a:hover { color: var(--accent); }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <div class="nav-brand">金道洋<span> · AI Agent</span></div>
+    <div class="nav-links">
+      <a href="#hero">首页</a>
+      <a href="#roadmap">路线</a>
+      <a href="#works">作品</a>
+      <a href="#practice">工程实践</a>
+      <a href="#demo">演示</a>
+      <a href="#contact">联系</a>
+      <button class="theme-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="hero">
+  <div class="wrap">
+    <div class="eyebrow">● 前端工程师 → AI Agent 应用开发</div>
+    <h1>用 6 周，从 0 到 1 构建<br><span class="grad">可运行、可评测、可观测</span>的 Agent 应用</h1>
+    <p class="lede">我是一名前端工程师，把 React / TypeScript / 工程化的底子迁移到 AI Agent 应用开发：
+      从流式聊天、RAG 检索，到 Mastra 多步编排，再用 LLM-as-judge 评测与自建 Trace 做质量护栏。
+      每个作品都是真实跑通的工程，而不只是 Demo 截图。</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#works">查看作品 →</a>
+      <a class="btn btn-ghost" href="#roadmap">看学习路线</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="n">4<span class="u"> 个</span></div><div class="l">可运行 Agent 工程</div></div>
+      <div class="stat"><div class="n">6<span class="u"> 周</span></div><div class="l">系统学习路线</div></div>
+      <div class="stat"><div class="n">2<span class="u"> 套</span></div><div class="l">质量护栏（Eval / Trace）</div></div>
+      <div class="stat"><div class="n">100<span class="u">%</span></div><div class="l">前端可视化差异化</div></div>
+    </div>
+  </div>
+</header>
+
+<section id="roadmap">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Learning Roadmap</div>
+      <h2>6 周学习路线</h2>
+      <p>从概念到交付，循序渐进。每一周都有「学什么 + 拿到什么 + 配套工程」，最终沉淀为本作品集。</p>
+    </div>
+    <div class="timeline">
+      <div class="tl-card done reveal"><div class="tl-week">W1</div><h3>Agent 概念</h3><p>LLM / Tool / Agent 循环 / 主流框架全景</p></div>
+      <div class="tl-card done reveal"><div class="tl-week">W2</div><h3>流式聊天 + 工具</h3><p>Vercel AI SDK streamText + 工具调用可视化</p></div>
+      <div class="tl-card done reveal"><div class="tl-week">W3</div><h3>RAG 检索增强</h3><p>向量库 + Embedding + 带引用生成</p></div>
+      <div class="tl-card done reveal"><div class="tl-week">W4</div><h3>多步编排</h3><p>Mastra Agent / Workflow 编排</p></div>
+      <div class="tl-card done reveal"><div class="tl-week">W5</div><h3>评测与可观测</h3><p>LLM-as-judge + 自建 Tracer / telemetry</p></div>
+      <div class="tl-card current reveal"><div class="tl-week">W6</div><h3>作品集交付</h3><p>整合打磨 + 录屏 + 面试讲解</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="works" style="background: var(--bg-soft);">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Projects</div>
+      <h2>四个可运行的 Agent 工程</h2>
+      <p>每个工程都配套完整 README、可一键运行，并在本页下方给出演示与录屏脚本。</p>
+    </div>
+    <div class="grid">
+
+      <div class="card reveal">
+        <div class="card-top"><span class="badge">W2 · 流式聊天</span><span>React + AI SDK</span></div>
+        <h3>Agent 流式聊天 + 工具调用</h3>
+        <p class="pitch">用 Vercel AI SDK 搭流式聊天，并让模型主动调用真实工具；前端把工具调用的输入/输出/状态实时可视化——这是前端工程师做 Agent 的护城河。</p>
+        <div class="tags"><span class="tag">Express</span><span class="tag">streamText</span><span class="tag">useChat</span><span class="tag">工具可视化</span></div>
+        <div class="card-foot">
+          <a href="../w2-agent-chat/README.md">README →</a>
+          <span class="run">npm run dev</span>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-top"><span class="badge">W3 · RAG</span><span>检索增强</span></div>
+        <h3>RAG 流式问答站</h3>
+        <p class="pitch">把「检索」封装成工具，模型自主调用 retrieve 从本地知识库取回相关片段，再带引用流式作答。检索来源（文件名 + 相似度 + 片段）前端可视化。</p>
+        <div class="tags"><span class="tag">Embedding</span><span class="tag">向量库</span><span class="tag">引用可视化</span><span class="tag">fetchUrl</span></div>
+        <div class="card-foot">
+          <a href="../w3-rag-qa/README.md">README →</a>
+          <span class="run">npm run dev</span>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-top"><span class="badge">W4 · 编排</span><span>Mastra</span></div>
+        <h3>Mastra 多步编排：简历打分器</h3>
+        <p class="pitch">读简历 → 抓 JD → 多维度打分 → 给改进建议的多步 Agent。体会 Agent 封装 / 工具 / 记忆 / 结构化输出 / Workflow 编排，比裸写 AI SDK 多出来的工程能力。</p>
+        <div class="tags"><span class="tag">@mastra/core</span><span class="tag">Workflow</span><span class="tag">结构化输出</span><span class="tag">工具</span></div>
+        <div class="card-foot">
+          <a href="../w4-resume-scorer/README.md">README →</a>
+          <span class="run">npm start</span>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-top"><span class="badge green">W5 · 护栏</span><span>质量</span></div>
+        <h3>Agent 评测与可观测</h3>
+        <p class="pitch">给前三个 Agent 套上质量护栏：LLM-as-judge 自动打分评测 + 自建 Tracer / AI SDK telemetry 把一次运行变成可观测的时间线。玩具与产品的分水岭。</p>
+        <div class="tags"><span class="tag">LLM-as-judge</span><span class="tag">rubric</span><span class="tag">Span</span><span class="tag">OTel</span></div>
+        <div class="card-foot">
+          <a href="../w5-agent-eval/README.md">README →</a>
+          <span class="run">npm test / npm run eval</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section id="practice">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Engineering Practices</div>
+      <h2>让 Agent 从「玩具」变「产品」的两件事</h2>
+      <p>多数练手项目止步于「能跑」，而工程化交付需要质量护栏。W5 把评测与可观测做成可复用工具箱，并嫁接到前三个作品上。</p>
+    </div>
+    <div class="practice">
+      <div class="prac-card reveal">
+        <div class="ic">⚖️</div>
+        <h3>评测 Eval（LLM-as-judge）</h3>
+        <p>改了 prompt / 工具后，怎么知道 Agent 没变差？用 rubric + LLM 评审员对输出自动打 0–10 分。</p>
+        <ul>
+          <li><b>确定性指标</b>：精确匹配 / 正则 / 工具结果断言</li>
+          <li><b>LLM-as-judge</b>：<code>generateObject</code> + zod 打分（score / passed / reasoning）</li>
+          <li><b>数据集驱动</b>：<code>{id, input, criteria:[{name, weight}]}</code></li>
+          <li><b>回归 / CI</b>：把 <code>runEval</code> 接进流水线，评分掉档即红</li>
+        </ul>
+      </div>
+      <div class="prac-card green reveal">
+        <div class="ic">🔭</div>
+        <h3>可观测 Observability</h3>
+        <p>线上 Agent 卡住 / 乱调工具，怎么排查？把每次运行的模型调用、工具调用、各阶段记成 span 时间线。</p>
+        <ul>
+          <li><b>Span 模型</b>：有开始/结束/耗时、可嵌套，一次运行 = 一棵 span 树</li>
+          <li><b>零依赖 Tracer</b>：<code>span()/event()/report()</code> 离线即可跑</li>
+          <li><b>标准对接</b>：AI SDK <code>telemetry</code> → OpenTelemetry / OTLP</li>
+          <li><b>生产可迁</b>：Langfuse / LangSmith / Jaeger 直接消费</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo" style="background: var(--bg-soft);">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Demo & Screencast</div>
+      <h2>演示与录屏脚本</h2>
+      <p>给面试官 / 招聘方的一段 3–5 分钟录屏建议，覆盖四个作品与两套质量护栏。</p>
+    </div>
+    <div class="demo-box reveal">
+      <div class="steps">
+        <div class="step"><div class="num"></div><div class="body"><h4>开场：我是谁（20s）</h4><p>前端工程师转型 AI Agent 应用开发，6 周做了 4 个可运行工程 + 质量护栏。</p></div></div>
+        <div class="step"><div class="num"></div><div class="body"><h4>W2 流式聊天（50s）</h4><p>跑 <code>cd w2-agent-chat &amp;&amp; npm run dev</code>，演示「读 agent-guide.md 并总结」「北京天气」，强调工具调用可视化。</p></div></div>
+        <div class="step"><div class="num"></div><div class="body"><h4>W3 RAG（50s）</h4><p>跑 <code>cd w3-rag-qa &amp;&amp; npm run dev</code>，提问知识库内容，展示检索来源（文件名 + 相似度 + 片段）与引用。</p></div></div>
+        <div class="step"><div class="num"></div><div class="body"><h4>W4 编排（50s）</h4><p>跑 <code>cd w4-resume-scorer &amp;&amp; npm start</code>，展示「读简历→抓 JD→多维度打分→建议」的多步编排与结构化报告。</p></div></div>
+        <div class="step"><div class="num"></div><div class="body"><h4>W5 护栏（60s）</h4><p>跑 <code>cd w5-agent-eval &amp;&amp; npm test</code>（离线单测）+ <code>npm run eval</code>（真实评测出 eval-report.md），讲 Span 时间线与 OTel 对接。</p></div></div>
+        <div class="step"><div class="num"></div><div class="body"><h4>收尾：工程化视角（30s）</h4><p>前端的可视化能力 + Agent 的质量护栏，是我做 AI 产品的差异化优势。</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer id="contact">
+  <div class="wrap foot-inner">
+    <div>
+      <div style="font-weight:700;color:var(--text);font-size:15px;">金道洋 · AI Agent 应用开发作品集</div>
+      <div style="font-size:13px;margin-top:4px;">用工程化方式做 Agent —— 可运行 · 可评测 · 可观测</div>
+    </div>
+    <div class="foot-links">
+      <a href="../w2-agent-chat/README.md">W2</a>
+      <a href="../w3-rag-qa/README.md">W3</a>
+      <a href="../w4-resume-scorer/README.md">W4</a>
+      <a href="../w5-agent-eval/README.md">W5</a>
+      <a href="../金道洋-前端开发工程师-简历.html">简历</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // theme toggle
+  const root = document.documentElement;
+  const btn = document.getElementById('themeBtn');
+  const saved = localStorage.getItem('w6-theme');
+  if (saved) { root.setAttribute('data-theme', saved); btn.textContent = saved === 'dark' ? '☀️' : '🌙'; }
+  btn.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    btn.textContent = next === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem('w6-theme', next);
+  });
+
+  // active nav highlight
+  const links = [...document.querySelectorAll('.nav-links a[href^="#"]')];
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const id = e.target.id;
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+      }
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  sections.forEach(s => obs.observe(s));
+
+  // reveal on scroll
+  const rev = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); rev.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => rev.observe(el));
+</script>
+</body>
+</html>
