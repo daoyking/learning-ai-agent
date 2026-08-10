@@ -38,3 +38,6 @@ Thumbs.db
 
 # local eval reports (generated, not source)
 **/eval-report.md
+
+# agent project data (private, not source)
+.workbuddy/
