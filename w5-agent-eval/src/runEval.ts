@@ -4,6 +4,9 @@ import { tracer } from './trace.js';
 import { langfuseExporter } from './langfuse.js';
 import { loadDataset, type EvalCase } from './dataset.js';
 
+// 供 W2/W3/W4 的 evals/run.ts 直接复用 judge（它们从 runEval 里 import llmJudge）
+export { llmJudge } from './judge.js';
+
 export interface CaseResult {
   id: string;
   output: string;

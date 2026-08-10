@@ -9,10 +9,13 @@ import type { AgentRun, AgentToolCall } from '../../w5-agent-eval/src/agent.js';
 export async function agent(input: string): Promise<AgentRun> {
   const res = (await resumeScorer.generate(input)) as any;
   const text: string = res?.text ?? '';
-  const toolCalls: AgentToolCall[] = (res?.toolCalls ?? []).map((tc: any) => ({
-    tool: tc?.toolName ?? tc?.name ?? 'tool',
-    input: tc?.input ?? {},
-    output: tc?.output,
-  }));
+  // Mastra 的 toolCalls 为 { type: 'tool-call', payload: { toolName, args, ... } }
+  const toolCalls: AgentToolCall[] = (res?.toolCalls ?? [])
+    .filter((tc: any) => tc?.type === 'tool-call')
+    .map((tc: any) => ({
+      tool: tc?.payload?.toolName ?? tc?.toolName ?? tc?.name ?? 'tool',
+      input: tc?.payload?.args ?? tc?.input ?? {},
+      output: tc?.payload?.output ?? tc?.output,
+    }));
   return { text, toolCalls };
 }

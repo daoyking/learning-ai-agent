@@ -4,7 +4,7 @@ import { model } from './model.js';
 
 // 单条标准的评审结果 schema
 export const judgeSchema = z.object({
-  score: z.number().min(0).max(10).describe('0-10 分'),
+  score: z.coerce.number().describe('0-10 分'),
   passed: z.boolean().describe('是否达到可用门槛（score>=7）'),
   reasoning: z.string().describe('一句话评审理由'),
 });
@@ -46,5 +46,8 @@ export const llmJudge: JudgeFn = async ({ criterion, agentOutput, context, toolC
       `请严格只输出如下 JSON（不要 markdown 代码块、不要解释）：\n` +
       `{"score": <0-10 的数字>, "passed": <true 或 false>, "reasoning": "<一句话理由>"}`,
   });
-  return judgeSchema.parse(extractJson(text));
+  const raw = judgeSchema.parse(extractJson(text));
+  // 夹取到 [0,10]，容忍模型偶发越界（如把总分满分带入单条评分）
+  const score = Math.max(0, Math.min(10, Number(raw.score)));
+  return { score, passed: score >= 7, reasoning: raw.reasoning };
 };
