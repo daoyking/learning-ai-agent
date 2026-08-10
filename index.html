@@ -191,6 +191,23 @@
   .trace-row.root .trace-bar { background: var(--accent); }
   .trace-row.child .trace-bar { background: var(--accent-2); opacity: .85; }
 
+  /* REGRESSION GRID (W2-W4) */
+  .reg-block { margin-top: 54px; }
+  .reg-head { margin-bottom: 26px; }
+  .reg-head h3 { font-size: clamp(20px, 2.6vw, 26px); font-weight: 800; letter-spacing: -.3px; margin-top: 8px; }
+  .reg-head p { color: var(--text-soft); margin-top: 10px; max-width: 720px; font-size: 15px; }
+  .reg-head code { font-family: var(--mono); font-size: 12.5px; background: var(--bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: var(--accent); }
+  .reg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 760px) { .reg-grid { grid-template-columns: 1fr; } }
+  .reg-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 20px; box-shadow: var(--shadow); transition: transform .2s, border-color .2s; }
+  .reg-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .reg-card .reg-top { margin-bottom: 4px; }
+  .reg-card .reg-n { font-size: 34px; font-weight: 800; letter-spacing: -.5px; margin: 12px 0 2px; color: var(--accent); }
+  .reg-card .reg-n span { font-size: 17px; color: var(--text-faint); font-weight: 600; }
+  .reg-card .reg-l { font-size: 13px; color: var(--text-faint); }
+  .reg-card a { display: inline-block; margin-top: 14px; font-size: 13.5px; font-weight: 600; color: var(--accent); }
+  .reg-card a:hover { text-decoration: underline; }
+
   /* FOOTER */
   footer { border-top: 1px solid var(--border); padding: 40px 0; color: var(--text-faint); }
   .foot-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
@@ -381,6 +398,34 @@
           <div class="trace-row child"><div class="tl">agent:synthesize <span>3.3s</span></div><div class="trace-track"><div class="trace-bar" style="left:58.2%;width:38.8%"></div></div></div>
         </div>
         <div class="evid-note">✅ <b>真实 trace</b>：由 <code>npm run eval</code> 在 DeepSeek 实跑生成，共 6 个 span（2 用例 × <code>agent:run</code> + <code>agent:synthesize</code> 兜底）。<br>配置 <b>LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY</b> 后，同一份 span 树自动 flush 到 Langfuse（<code>model:</code> 前缀 span 映射为 generation）。</div>
+      </div>
+    </div>
+
+    <div class="reg-block">
+      <div class="reg-head">
+        <div class="sec-tag">W2–W4 真实回归评测</div>
+        <h3>跨周 CI 回归：三个 Agent 工程用真实 LLM 实跑</h3>
+        <p>把 W5 的 <code>runEval</code> 评测脚手架嫁接到 W2 / W3 / W4，用同一份 <code>deepseek-chat</code> 真实管线 + LLM-as-judge 跑出下列结果。改了 prompt / 工具后复跑，分数掉档即说明回归。</p>
+      </div>
+      <div class="reg-grid">
+        <div class="reg-card reveal">
+          <div class="reg-top"><span class="badge">W2 · 流式聊天</span></div>
+          <div class="reg-n">100<span>%</span></div>
+          <div class="reg-l">通过率 · 加权均分 10.0/10</div>
+          <a href="eval-reports/w2-agent-chat.md">完整报告 →</a>
+        </div>
+        <div class="reg-card reveal">
+          <div class="reg-top"><span class="badge">W3 · RAG</span></div>
+          <div class="reg-n">100<span>%</span></div>
+          <div class="reg-l">通过率 · 加权均分 9.7/10</div>
+          <a href="eval-reports/w3-rag-qa.md">完整报告 →</a>
+        </div>
+        <div class="reg-card reveal">
+          <div class="reg-top"><span class="badge green">W4 · 编排</span></div>
+          <div class="reg-n">100<span>%</span></div>
+          <div class="reg-l">通过率 · 加权均分 8.98/10</div>
+          <a href="eval-reports/w4-resume-scorer.md">完整报告 →</a>
+        </div>
       </div>
     </div>
   </div>
