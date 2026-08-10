@@ -1,4 +1,4 @@
-import { streamText } from 'ai';
+import { streamText, generateText } from 'ai';
 import { calculator, searchDocs } from './tools.js';
 import { model } from './model.js';
 import { tracer } from './trace.js';
@@ -25,6 +25,8 @@ export async function runAgent(prompt: string): Promise<AgentRun> {
         '先用中文简短说明思路，再给出最终答案。',
       prompt,
       tools: { calculator, searchDocs },
+      // 演示用：强制模型在需要时使用工具，避免只在文本里「口述」而不实际调用
+      toolChoice: 'required',
       // 可观测性：开启 AI SDK 原生 telemetry。
       // 有 OpenTelemetry SDK 时导出到 collector；无 SDK 时自动 no-op，不会报错。
       telemetry: {
@@ -41,9 +43,30 @@ export async function runAgent(prompt: string): Promise<AgentRun> {
     });
 
     let text = '';
-    for await (const delta of result.textStream) {
-      text += delta;
+    try {
+      text = await result.text; // 取跨所有步骤（含工具回环后）的完整最终文本
+    } catch {
+      text = '';
     }
+
+    // 兜底：部分模型在强制工具调用后只返回 tool call、不再生成文本。
+    // 此时基于工具真实结果合成最终回答（真实 Agent 常见模式）。
+    if (!text.trim() && toolCalls.length) {
+      text = await tracer.span('agent:synthesize', async () => {
+        const { text: answer } = await generateText({
+          model,
+          system: '你是助手。请基于已调用的工具结果，用中文给出最终回答（含简短思路与明确答案）。',
+          prompt:
+            `用户问题：${prompt}\n\n已调用的工具与结果：\n` +
+            toolCalls
+              .map((t) => `- ${t.tool}(${JSON.stringify(t.input)}) => ${JSON.stringify(t.output)}`)
+              .join('\n') +
+            `\n\n请据此作答。`,
+        });
+        return answer;
+      });
+    }
+
     tracer.event('model-output', { chars: text.length });
     return { text, toolCalls };
   });

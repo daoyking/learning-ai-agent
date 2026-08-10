@@ -1,34 +1,28 @@
-# Eval 报告（离线示例）
-
-> ⚠️ **本文件由 w5 评测管线的同构逻辑生成，但使用了零依赖 mock judge / mock agent**。评分为示例值，仅用于展示报告格式与管线串联。
-> 真实评测：在 `w5-agent-eval` 目录配置 `OPENAI_API_KEY` 后运行 `npm run eval` 即可生成真实打分报告。
+# Eval 报告
 
 - 用例数：2
 - 通过率：100%
-- 加权均分：8.8/10
+- 加权均分：9.8/10
 
-### calc-1 · 得分 8.8 ✅（工具调用 1 次）
-- 调用工具: 9/10 ✅ — （离线示例）mock judge 固定启发式打分，非真实 LLM 评审。配置 OPENAI_API_KEY 后运行 `npm run eval`（w5-agent-eval）可生成真实评测报告。
-- 结果正确: 8/10 ✅ — （离线示例）mock judge 固定启发式打分，非真实 LLM 评审。配置 OPENAI_API_KEY 后运行 `npm run eval`（w5-agent-eval）可生成真实评测报告。
-- 有解释: 10/10 ✅ — （离线示例）mock judge 固定启发式打分，非真实 LLM 评审。配置 OPENAI_API_KEY 后运行 `npm run eval`（w5-agent-eval）可生成真实评测报告。
+### calc-1 · 得分 9.6 ✅ · 工具调用 1 次
+- 调用工具: 10/10 ✅ — Agent 正确调用了 calculator 工具并基于其结果给出准确答案。
+- 结果正确: 10/10 ✅ — 答案正确为84，且调用了calculator工具，完全符合标准。
+- 有解释: 8/10 ✅ — 答案包含简要中文说明，正确解释计算步骤，符合标准。
 
-### rag-1 · 得分 8.8 ✅（工具调用 1 次）
-- 调用检索: 8/10 ✅ — （离线示例）mock judge 固定启发式打分，非真实 LLM 评审。配置 OPENAI_API_KEY 后运行 `npm run eval`（w5-agent-eval）可生成真实评测报告。
-- 概念准确: 9/10 ✅ — （离线示例）mock judge 固定启发式打分，非真实 LLM 评审。配置 OPENAI_API_KEY 后运行 `npm run eval`（w5-agent-eval）可生成真实评测报告。
-- 降低幻觉: 10/10 ✅ — （离线示例）mock judge 固定启发式打分，非真实 LLM 评审。配置 OPENAI_API_KEY 后运行 `npm run eval`（w5-agent-eval）可生成真实评测报告。
+### rag-1 · 得分 10 ✅ · 工具调用 1 次
+- 调用检索: 10/10 ✅ — 正确调用了searchDocs工具，且回答内容完整、准确解释了RAG及其降低幻觉的机制。
+- 概念准确: 10/10 ✅ — 正确且清晰地说明了 RAG 是检索增强生成技术，并结合工具使用解释了其降低幻觉的原理。
+- 降低幻觉: 10/10 ✅ — Agent 调用了 searchDocs 工具，并在输出中明确说明了检索资料提供事实依据可降低幻觉，完全符合标准要求。
 
----
+## 🔭 Trace 时间线
 
-## 本地 Tracer 时间线（等价 Langfuse 接收内容）
+| # | Span | 父级 | 耗时(ms) | 关键属性 |
+|---|---|---|---|---|
+| 1 | eval:calc-1 | — | 7634 | — |
+| 2 | agent:run | span_1 | 3791 | — |
+| 3 | agent:synthesize | span_2 | 1423 | — |
+| 4 | eval:rag-1 | — | 8573 | — |
+| 5 | agent:run | span_4 | 4988 | — |
+| 6 | agent:synthesize | span_5 | 3323 | — |
 
-运行 `npm run demo`（w5-agent-eval）会输出如下结构的 trace；配置 `LANGFUSE_PUBLIC_KEY/SECRET_KEY` 后，
-同一份 span 树会自动 flush 到 Langfuse（trace 名 `agent-eval`，`model:` 前缀 span 映射为 generation）。
-
-| # | Span | 父级 | 耗时(ms) |
-|---|---|---|---|
-| 1 | agent:run | — | 63 |
-| 2 | retrieve | agent:run | 21 |
-| 3 | tool:calculator | agent:run | 11 |
-| 4 | model:generate | agent:run | 31 |
-
-**总 span 数**：4 · **累计耗时**：126ms
+**总 span 数**：6 · **累计耗时**：29732ms

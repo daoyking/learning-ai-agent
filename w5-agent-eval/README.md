@@ -16,7 +16,7 @@ src/
   trace.ts      零依赖自建 Tracer：span 时间线 + Markdown 报告
   tools.ts      calculator（安全四则）+ searchDocs（检索即工具）
   agent.ts      示例 Agent（streamText + telemetry 开启 + span 包裹）
-  judge.ts      LLM-as-judge（generateObject + zod 打分）
+  judge.ts      LLM-as-judge（generateText 抽 JSON + zod 校验打分；DeepSeek 不支持 json_schema 故不用 generateObject）
   dataset.ts    从 sample/dataset.json 加载评测用例
   runEval.ts    编排：跑 agent → 逐条 judge → 聚合 → 写报告
   demo.ts       离线演示 Tracer（无需 API key）

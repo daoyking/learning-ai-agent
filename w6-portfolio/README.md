@@ -100,11 +100,13 @@ npm run eval       # 真实 LLM 评测，写出 eval-report.md（需 key）
 - 把四个工程收进一个 **monorepo**（pnpm workspace），统一依赖与 lint。
 - 部署本作品集到静态托管（GitHub Pages / CloudStudio），生成可分享链接。
 
-## 已落地：评测数据集 + 真实 Langfuse（W6 收尾补完）
+## 已落地：评测数据集 + 可观测（W6 收尾补完）
 
 - **W2–W4 各配一份评测数据集**（`sample/eval-dataset.json`）+ `evals/agent.ts`（复用各自真实工具/模型）+
   `tests/eval.test.ts`（node:test + tsx 离线 CI 回归，零 key）+ `evals/run.ts`（真实 LLM 评测出各工程 `eval-report.md`）。
   跑法：`cd w2-agent-chat && npm test && npm run eval`（w3 / w4 同理）。
-- **W5 接真实 Langfuse**：`src/langfuse.ts` 的 `LangfuseExporter` 把自建 Tracer 的 span 树映射到 Langfuse
+- **W5 接可观测**：`src/langfuse.ts` 的 `LangfuseExporter` 把自建 Tracer 的 span 树映射到 Langfuse
   trace + 嵌套 observation，**条件式启用**（配 `LANGFUSE_PUBLIC_KEY/SECRET_KEY` 才导出，否则 no-op）。
-  离线 `npm run demo` / `npm test` 不受影响。详见各工程 README 与 `w5-agent-eval/README.md`。
+  离线 `npm run demo` / `npm test` 不受影响。
+- **作品集已含真实评测证据**：`eval-report.md` 是 W5 在 DeepSeek `deepseek-chat` 上实跑结果
+  （通过率 100%、加权均分 9.8/10），Trace 时间线也取自同一次实跑（6 个 span）。详见 `index.html` 的「质量护栏」节。

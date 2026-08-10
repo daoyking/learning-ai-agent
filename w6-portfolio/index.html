@@ -330,7 +330,7 @@
         <p>改了 prompt / 工具后，怎么知道 Agent 没变差？用 rubric + LLM 评审员对输出自动打 0–10 分。</p>
         <ul>
           <li><b>确定性指标</b>：精确匹配 / 正则 / 工具结果断言</li>
-          <li><b>LLM-as-judge</b>：<code>generateObject</code> + zod 打分（score / passed / reasoning）</li>
+          <li><b>LLM-as-judge</b>：LLM 抽 JSON + zod 校验打分（score / passed / reasoning）</li>
           <li><b>数据集驱动</b>：<code>{id, input, criteria:[{name, weight}]}</code></li>
           <li><b>回归 / CI</b>：把 <code>runEval</code> 接进流水线，评分掉档即红</li>
         </ul>
@@ -355,7 +355,7 @@
     <div class="sec-head reveal">
       <div class="sec-tag">Eval &amp; Trace · 实跑证据</div>
       <h2>质量护栏：评测报告 + 可观测 Trace</h2>
-      <p>W5 给前三个 Agent 套上评测与可观测。下面是用真实管线跑出的证据（离线示例，格式与真实运行完全一致）。</p>
+      <p>W5 给前三个 Agent 套上评测与可观测。下面是用真实管线在 DeepSeek <code>deepseek-chat</code> 上实跑出的证据（评测报告由 LLM-as-judge 生成，trace 由自建 Tracer 记录）。</p>
     </div>
     <div class="evid">
       <div class="evid-card reveal">
@@ -364,21 +364,23 @@
         <div class="evid-stats">
           <div><div class="n">2</div><div class="l">评测用例</div></div>
           <div><div class="n">100<span style="font-size:15px;color:var(--text-faint)">%</span></div><div class="l">通过率</div></div>
-          <div><div class="n">8.8<span style="font-size:15px;color:var(--text-faint)">/10</span></div><div class="l">加权均分</div></div>
+          <div><div class="n">9.8<span style="font-size:15px;color:var(--text-faint)">/10</span></div><div class="l">加权均分</div></div>
         </div>
         <a class="btn btn-ghost" href="eval-report.md" style="font-size:13.5px;padding:9px 16px;">查看完整报告 →</a>
-        <div class="evid-note">⚠️ 当前为<b>离线示例</b>：用零依赖 mock judge 生成，分数非真实 LLM 输出，仅展示报告格式与管线串联。<br>配置 <b>OPENAI_API_KEY</b> 后运行 <code>npm run eval</code>（w5-agent-eval）生成真实评测报告。</div>
+        <div class="evid-note">✅ <b>真实评测</b>：由 <code>w5-agent-eval</code> 的 <code>npm run eval</code> 在 DeepSeek <code>deepseek-chat</code> 上实跑，评测耗时约 16s、trace 累计 29.7s（见右侧）。<br>改 prompt / 工具后复跑，分数掉档即说明回归——这就是 CI 门禁的价值。</div>
       </div>
       <div class="evid-card reveal">
         <h3>🔭 Trace 时间线</h3>
         <div class="sub">自建 Tracer 的 span 树 · 结构等价 Langfuse 接收内容</div>
         <div class="trace">
-          <div class="trace-row root"><div class="tl">agent:run <span>63ms</span></div><div class="trace-track"><div class="trace-bar" style="left:0%;width:100%"></div></div></div>
-          <div class="trace-row child"><div class="tl">retrieve <span>21ms</span></div><div class="trace-track"><div class="trace-bar" style="left:0%;width:33%"></div></div></div>
-          <div class="trace-row child"><div class="tl">tool:calc <span>11ms</span></div><div class="trace-track"><div class="trace-bar" style="left:33%;width:17%"></div></div></div>
-          <div class="trace-row child"><div class="tl">model:gen <span>31ms</span></div><div class="trace-track"><div class="trace-bar" style="left:50%;width:49%"></div></div></div>
+          <div class="trace-case" style="font-size:12px;color:var(--text-faint);margin:6px 0 2px;font-weight:600;">用例 calc-1 · <b style="color:var(--text)">7.6s</b></div>
+          <div class="trace-row root"><div class="tl">agent:run <span>3.8s</span></div><div class="trace-track"><div class="trace-bar" style="left:0%;width:49.7%"></div></div></div>
+          <div class="trace-row child"><div class="tl">agent:synthesize <span>1.4s</span></div><div class="trace-track"><div class="trace-bar" style="left:49.7%;width:18.6%"></div></div></div>
+          <div class="trace-case" style="font-size:12px;color:var(--text-faint);margin:10px 0 2px;font-weight:600;">用例 rag-1 · <b style="color:var(--text)">8.6s</b></div>
+          <div class="trace-row root"><div class="tl">agent:run <span>5.0s</span></div><div class="trace-track"><div class="trace-bar" style="left:0%;width:58.2%"></div></div></div>
+          <div class="trace-row child"><div class="tl">agent:synthesize <span>3.3s</span></div><div class="trace-track"><div class="trace-bar" style="left:58.2%;width:38.8%"></div></div></div>
         </div>
-        <div class="evid-note">配置 <b>LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY</b> 后，同一份 span 树自动 flush 到 Langfuse（trace 名 <code>agent-eval</code>，<code>model:</code> 前缀 span 映射为 generation）。<br>本地时间线由 <code>npm run demo</code>（w5-agent-eval）实跑输出。</div>
+        <div class="evid-note">✅ <b>真实 trace</b>：由 <code>npm run eval</code> 在 DeepSeek 实跑生成，共 6 个 span（2 用例 × <code>agent:run</code> + <code>agent:synthesize</code> 兜底）。<br>配置 <b>LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY</b> 后，同一份 span 树自动 flush 到 Langfuse（<code>model:</code> 前缀 span 映射为 generation）。</div>
       </div>
     </div>
   </div>
@@ -415,7 +417,7 @@
       <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w3-rag-qa">W3</a>
       <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w4-resume-scorer">W4</a>
       <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w5-agent-eval">W5</a>
-      <a href="https://daoyking.github.io/learning-ai-agent/resume.html">简历</a>-%E5%89%8D%E7%AB%AF%E5%BC%80%E5%8F%91%E5%B7%A5%E7%A8%8B%E5%B8%88-%E7%AE%80%E5%8E%86.html">简历</a>
+      <a href="https://daoyking.github.io/learning-ai-agent/resume.html">简历</a>
     </div>
   </div>
 </footer>

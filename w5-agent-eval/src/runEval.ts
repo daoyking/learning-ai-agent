@@ -40,7 +40,12 @@ export async function runEval(
       let weighted = 0;
       for (const crit of c.criteria) {
         const w = crit.weight ?? 1;
-        const r = await judge({ criterion: crit.description, agentOutput: run.text, context: c.context });
+        const r = await judge({
+          criterion: crit.description,
+          agentOutput: run.text,
+          context: c.context,
+          toolCalls: run.toolCalls.map((t) => t.tool),
+        });
         criteria.push({ ...r, name: crit.name });
         weightSum += w;
         weighted += r.score * w;
@@ -82,7 +87,7 @@ export function renderEvalReport(report: EvalReport): string {
     report.cases
       .map(
         (c) =>
-          `### ${c.id} · 得分 ${c.caseScore} ${c.passed ? '✅' : '❌'}\n` +
+          `### ${c.id} · 得分 ${c.caseScore} ${c.passed ? '✅' : '❌'} · 工具调用 ${c.toolCalls} 次\n` +
           c.criteria.map((x) => `- ${x.name}: ${x.score}/10 ${x.passed ? '✅' : '❌'} — ${x.reasoning}`).join('\n'),
       )
       .join('\n\n') +

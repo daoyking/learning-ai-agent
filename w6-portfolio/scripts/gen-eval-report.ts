@@ -88,7 +88,7 @@ const report = await runEvalLocal(dataset);
 const md =
   `# Eval 报告（离线示例）\n\n` +
   `> ⚠️ **本文件由 w5 评测管线的同构逻辑生成，但使用了零依赖 mock judge / mock agent**。评分为示例值，仅用于展示报告格式与管线串联。\n` +
-  `> 真实评测：在 \`w5-agent-eval\` 目录配置 \`OPENAI_API_KEY\` 后运行 \`npm run eval\` 即可生成真实打分报告。\n\n` +
+  `> 真实评测：在 \`w5-agent-eval\` 目录配置 \`OPENAI_API_KEY\` 后运行 \`npm run eval\` 即可生成真实打分报告（已提交为 \`eval-report.md\`）。\n\n` +
   render(report).replace(/^# Eval 报告\n\n/, '') +
   `\n\n---\n\n## 本地 Tracer 时间线（等价 Langfuse 接收内容）\n\n` +
   `运行 \`npm run demo\`（w5-agent-eval）会输出如下结构的 trace；配置 \`LANGFUSE_PUBLIC_KEY/SECRET_KEY\` 后，\n` +
@@ -100,6 +100,6 @@ const md =
   `| 4 | model:generate | agent:run | 31 |\n\n` +
   `**总 span 数**：4 · **累计耗时**：126ms\n`;
 
-writeFileSync(resolve(dir, '../eval-report.md'), md);
-console.log('wrote', resolve(dir, '../eval-report.md'));
+writeFileSync(resolve(dir, '../eval-report.example.md'), md);
+console.log('wrote', resolve(dir, '../eval-report.example.md'));
 console.log('weightedScore', report.weightedScore, 'passRate', report.passRate);
