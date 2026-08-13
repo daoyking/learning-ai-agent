@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "tsx server/index.ts",
+    "memory:start": "AGENTMEMORY_DATA_DIR=$PWD/.agentmemory npx -y @agentmemory/agentmemory",
     "typecheck": "tsc --noEmit",
     "eval": "tsx evals/run.ts",
     "test": "node --import tsx --test tests/eval.test.ts"

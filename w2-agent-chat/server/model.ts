@@ -5,7 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 export function createModel() {
   const provider = createOpenAI({
     apiKey: process.env.OPENAI_API_KEY ?? 'missing',
-    baseURL: process.env.OPENAI_BASE_URL,
+    baseURL: process.env.OPENAI_BASE_URL || undefined,
   });
   // 用 .chat() 走 Chat Completions 协议，兼容 OpenAI / DeepSeek / 通义 / OpenRouter 等
   // （默认 Responses API 仅 OpenAI 官方支持，国内服务商不支持）

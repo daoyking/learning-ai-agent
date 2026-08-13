@@ -51,3 +51,23 @@ npm run eval    # 真实 LLM 评测：跑真实 Agent 并写出 eval-report.md�
 `evals/agent.ts` 复用本工程真实的 `tools` + `createModel()`，把对话跑成无头 `AgentRun` 交给评测；
 `evals/run.ts` 调用 W5 的 `runEval(llmJudge, agent, dataset)`，评分逻辑与 W5 完全一致（评测即回归）。
 
+
+## 长期记忆（agentmemory）
+
+本项目接入了 [agentmemory](https://github.com/rohitg00/agentmemory) 作为长期记忆服务：
+- 每次对话前，用最后一条用户消息召回相关历史记忆，注入 system prompt；
+- 对话结束后，把本轮对话自动存入记忆（本地向量化，免费，无需额外 key）；
+- 记忆数据存于项目内 `data/` 目录（已 gitignore），可整个目录删掉重置。
+
+### 启动方式（两个终端）
+
+```bash
+# 终端 1：先启动记忆服务（端口 3111，实时查看器 3113）
+npm run memory:start
+
+# 终端 2：再启动项目
+npm run dev
+```
+
+验证记忆服务是否就绪：`curl http://localhost:3111/agentmemory/health`。
+服务未启动时聊天功能不受影响（记忆部分自动跳过）。
