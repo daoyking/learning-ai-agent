@@ -230,6 +230,7 @@
       <a href="#roadmap">路线</a>
       <a href="#works">作品</a>
       <a href="#practice">工程实践</a>
+      <a href="#memory">记忆方案</a>
       <a href="#evidence">护栏证据</a>
       <a href="#demo">演示</a>
       <a href="#contact">联系</a>
@@ -363,6 +364,69 @@
           <li><b>生产可迁</b>：Langfuse / LangSmith / Jaeger 直接消费</li>
         </ul>
       </div>
+    </div>
+  </div>
+</section>
+
+<section id="memory">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-tag">Agent Memory &amp; RAG</div>
+      <h2>Agent 记忆方案 + RAG 效率</h2>
+      <p>知识扩展：除向量数据库外，Agent 记忆还能用哪些方案落地？RAG 又该怎么从提示词、检索、工程三层提效。下面这张对比图把方案与取舍一次讲清。</p>
+    </div>
+    <div class="demo-box reveal">
+      <svg viewBox="0 0 680 488" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Agent 记忆方案对比图，含四种替代方案、混合推荐与 RAG 效率要点">
+        <text x="340" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="var(--text)">Agent 记忆方案对比</text>
+        <text x="340" y="46" text-anchor="middle" font-size="13" fill="var(--text-soft)">除向量数据库外的替代方案及适用场景</text>
+
+        <g transform="translate(40,70)">
+          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+          <rect x="0" y="14" width="4" height="66" rx="2" fill="#378ADD"/>
+          <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">SQLite / 关系型 DB</text>
+          <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">结构化数据 · 精确查询</text>
+          <text x="22" y="70" font-size="12.5" fill="var(--text-soft)">用户偏好、项目配置、订单记录</text>
+          <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 快查询  ✗ 无语义检索</text>
+        </g>
+        <g transform="translate(350,70)">
+          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+          <rect x="0" y="14" width="4" height="66" rx="2" fill="#1D9E75"/>
+          <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">JSON 文件</text>
+          <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">轻量 · Git 友好</text>
+          <text x="22" y="70" font-size="12.5" fill="var(--text-soft)">知识库、配置快照、小上下文</text>
+          <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 零依赖  ✗ 大文件慢</text>
+        </g>
+
+        <g transform="translate(40,178)">
+          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+          <rect x="0" y="14" width="4" height="66" rx="2" fill="#7F77DD"/>
+          <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">Redis / Memcached</text>
+          <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">会话级 · 极低延迟</text>
+          <text x="22" y="70" font-size="12.5" fill="var(--text-soft)">短期上下文、对话历史缓存</text>
+          <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 极快  ✗ 数据易失</text>
+        </g>
+        <g transform="translate(350,178)">
+          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+          <rect x="0" y="14" width="4" height="66" rx="2" fill="#D85A30"/>
+          <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">知识图谱 (Graph DB)</text>
+          <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">实体关系 · 精确推理</text>
+          <text x="22" y="70" font-size="12.5" fill="var(--text-soft)">Obsidian Wiki、复杂实体关联</text>
+          <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 关联强  ✗ 构建贵</text>
+        </g>
+
+        <g transform="translate(40,290)">
+          <rect width="600" height="74" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="22" y="32" font-size="14" font-weight="600" fill="var(--accent)">推荐：混合方案</text>
+          <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">向量库（语义检索）+ SQLite（结构化过滤）+ 知识图谱（实体关联）—— 兼顾灵活与精确</text>
+        </g>
+
+        <g transform="translate(40,384)" font-size="12.5">
+          <text x="0" y="6" font-size="13.5" font-weight="600" fill="var(--text)">RAG 效率优化三层</text>
+          <g transform="translate(0,22)"><circle cx="7" cy="5" r="4" fill="#1D9E75"/><text x="20" y="9" fill="var(--text-soft)">提示词：[Context] 分隔检索结果，Few-shot 示例，结构化输出，拒答机制</text></g>
+          <g transform="translate(0,42)"><circle cx="7" cy="5" r="4" fill="#378ADD"/><text x="20" y="9" fill="var(--text-soft)">检索：BM25 关键词 + 向量混合检索，Rerank 精排，多粒度切片</text></g>
+          <g transform="translate(0,62)"><circle cx="7" cy="5" r="4" fill="#BA7517"/><text x="20" y="9" fill="var(--text-soft)">工程：Query 缓存（TTL 1h–24h）、增量更新、异步预取</text></g>
+        </g>
+      </svg>
     </div>
   </div>
 </section>
