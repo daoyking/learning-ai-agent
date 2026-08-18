@@ -70,7 +70,26 @@
     display: grid; place-items: center; transition: .2s;
   }
   .theme-btn:hover { color: var(--text); border-color: var(--accent); }
-  @media (max-width: 720px) { .nav-links a:not(.theme-wrap) { display: none; } }
+  .menu-btn {
+    display: none; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-soft);
+    width: 34px; height: 34px; border-radius: 9px; cursor: pointer; font-size: 17px;
+    place-items: center; transition: .2s; margin-left: 6px;
+  }
+  .menu-btn:hover { color: var(--text); border-color: var(--accent); }
+  @media (max-width: 720px) {
+    .nav-inner { position: relative; }
+    .menu-btn { display: grid; }
+    .nav-links {
+      position: absolute; top: 60px; left: 0; right: 0;
+      flex-direction: column; align-items: stretch; gap: 2px;
+      background: var(--bg-card); border-bottom: 1px solid var(--border);
+      padding: 8px 24px 14px; box-shadow: var(--shadow); display: none;
+    }
+    .nav-links.open { display: flex; }
+    .nav-links a { padding: 11px 2px; font-size: 15px; border-bottom: 1px solid var(--border); }
+    .nav-links a:last-of-type { border-bottom: none; }
+    .nav-links .theme-btn { align-self: flex-end; margin-top: 8px; width: 34px; height: 34px; }
+  }
 
   /* HERO */
   .hero { padding: 92px 0 72px; position: relative; overflow: hidden; }
@@ -104,6 +123,11 @@
   .stat .n { font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
   .stat .n .u { font-size: 16px; color: var(--text-faint); font-weight: 600; margin-left: 2px; }
   .stat .l { font-size: 13px; color: var(--text-faint); margin-top: 2px; }
+  .tech-strip { position: relative; z-index: 1; margin-top: 42px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .ts-label { font-size: 12px; font-weight: 700; color: var(--text-faint); letter-spacing: 1.5px; text-transform: uppercase; }
+  .ts-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ts { font-size: 13px; color: var(--text-soft); background: var(--bg-card); border: 1px solid var(--border); padding: 6px 13px; border-radius: 999px; font-weight: 500; transition: .2s; }
+  .ts:hover { color: var(--accent); border-color: var(--accent); }
 
   /* SECTION */
   section { padding: 64px 0; }
@@ -168,6 +192,10 @@
   .step .body h4 { font-size: 15.5px; }
   .step .body p { color: var(--text-soft); font-size: 14px; margin-top: 3px; }
   .step .body code { font-family: var(--mono); font-size: 12.5px; background: var(--bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; }
+  .checklist { margin-top: 26px; border-top: 1px dashed var(--border); padding-top: 22px; }
+  .checklist h4 { font-size: 15.5px; margin-bottom: 14px; color: var(--text); }
+  .chk { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-soft); margin: 9px 0; cursor: pointer; }
+  .chk input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; flex: 0 0 auto; }
 
   /* EVIDENCE */
   .evid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
@@ -249,6 +277,7 @@
       <a href="#contact">联系</a>
       <a href="https://daoyking.github.io/learning-ai-agent/resume.html" target="_blank" rel="noopener">简历 ↗</a>
       <button class="theme-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+      <button class="menu-btn" id="menuBtn" aria-label="打开菜单" aria-expanded="false">☰</button>
     </div>
   </div>
 </nav>
@@ -270,6 +299,23 @@
       <div class="stat"><div class="n">6<span class="u"> 周</span></div><div class="l">系统学习路线</div></div>
       <div class="stat"><div class="n">2<span class="u"> 套</span></div><div class="l">质量护栏（Eval / Trace）</div></div>
       <div class="stat"><div class="n">100<span class="u">%</span></div><div class="l">前端可视化差异化</div></div>
+    </div>
+    <div class="tech-strip reveal">
+      <div class="ts-label">技术栈</div>
+      <div class="ts-tags">
+        <span class="ts">React</span>
+        <span class="ts">Vue 3</span>
+        <span class="ts">Svelte</span>
+        <span class="ts">TypeScript</span>
+        <span class="ts">Vite</span>
+        <span class="ts">Node.js</span>
+        <span class="ts">Express</span>
+        <span class="ts">Vercel AI SDK</span>
+        <span class="ts">Mastra</span>
+        <span class="ts">LangGraph</span>
+        <span class="ts">RAG</span>
+        <span class="ts">OpenTelemetry</span>
+      </div>
     </div>
   </div>
 </header>
@@ -572,6 +618,14 @@
         <div class="step"><div class="num"></div><div class="body"><h4>W5 护栏（60s）</h4><p>跑 <code>cd w5-agent-eval &amp;&amp; npm test</code>（离线单测）+ <code>npm run eval</code>（真实评测出 eval-report.md），讲 Span 时间线与 OTel 对接。</p></div></div>
         <div class="step"><div class="num"></div><div class="body"><h4>收尾：工程化视角（30s）</h4><p>前端的可视化能力 + Agent 的质量护栏，是我做 AI 产品的差异化优势。</p></div></div>
       </div>
+      <div class="checklist">
+        <h4>🎬 录屏前自检清单</h4>
+        <label class="chk"><input type="checkbox" /> Node 22 已就位，四个工程 <code style="font-family:var(--mono);font-size:12px;background:var(--bg);border:1px solid var(--border);padding:0 5px;border-radius:5px;">npm install</code> 均通过</label>
+        <label class="chk"><input type="checkbox" /> DeepSeek / 模型 API Key 已配置，<code style="font-family:var(--mono);font-size:12px;background:var(--bg);border:1px solid var(--border);padding:0 5px;border-radius:5px;">npm run eval</code> 可跑出真实报告</label>
+        <label class="chk"><input type="checkbox" /> 屏幕分辨率调到 1280×800，关闭通知，准备 3–5 分钟讲解</label>
+        <label class="chk"><input type="checkbox" /> 按上面脚本走一遍：开场 → W2 → W3 → W4 → W5 → 收尾</label>
+        <label class="chk"><input type="checkbox" /> 把本作品集（含此页）与简历页并排，作为面试讲解入口</label>
+      </div>
     </div>
   </div>
 </section>
@@ -630,6 +684,20 @@
     toTop.classList.toggle('show', window.scrollY > 480);
   }, { passive: true });
   toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+  // mobile hamburger menu
+  const menuBtn = document.getElementById('menuBtn');
+  const navLinks = document.querySelector('.nav-links');
+  menuBtn.addEventListener('click', () => {
+    const open = navLinks.classList.toggle('open');
+    menuBtn.setAttribute('aria-expanded', String(open));
+    menuBtn.textContent = open ? '✕' : '☰';
+  });
+  navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    navLinks.classList.remove('open');
+    menuBtn.setAttribute('aria-expanded', 'false');
+    menuBtn.textContent = '☰';
+  }));
 </script>
 <button id="toTop" class="to-top" aria-label="返回顶部">↑</button>
 </body>
