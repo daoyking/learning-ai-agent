@@ -218,6 +218,19 @@
   /* reveal */
   .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
   .reveal.in { opacity: 1; transform: none; }
+
+  /* back to top */
+  .to-top {
+    position: fixed; right: 22px; bottom: 22px; z-index: 60;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: var(--bg-card); color: var(--text-soft);
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    cursor: pointer; font-size: 18px; display: grid; place-items: center;
+    opacity: 0; pointer-events: none; transform: translateY(8px);
+    transition: opacity .25s, transform .25s, color .2s, border-color .2s;
+  }
+  .to-top.show { opacity: 1; pointer-events: auto; transform: none; }
+  .to-top:hover { color: var(--accent); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -234,6 +247,7 @@
       <a href="#evidence">护栏证据</a>
       <a href="#demo">演示</a>
       <a href="#contact">联系</a>
+      <a href="https://daoyking.github.io/learning-ai-agent/resume.html" target="_blank" rel="noopener">简历 ↗</a>
       <button class="theme-btn" id="themeBtn" aria-label="切换主题">🌙</button>
     </div>
   </div>
@@ -249,6 +263,7 @@
     <div class="hero-cta">
       <a class="btn btn-primary" href="#works">查看作品 →</a>
       <a class="btn btn-ghost" href="#roadmap">看学习路线</a>
+      <a class="btn btn-ghost" href="https://daoyking.github.io/learning-ai-agent/resume.html" target="_blank" rel="noopener">看简历 ↗</a>
     </div>
     <div class="hero-stats">
       <div class="stat"><div class="n">4<span class="u"> 个</span></div><div class="l">可运行 Agent 工程</div></div>
@@ -608,6 +623,14 @@
     entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); rev.unobserve(e.target); } });
   }, { threshold: 0.12 });
   document.querySelectorAll('.reveal').forEach(el => rev.observe(el));
+
+  // back to top
+  const toTop = document.getElementById('toTop');
+  window.addEventListener('scroll', () => {
+    toTop.classList.toggle('show', window.scrollY > 480);
+  }, { passive: true });
+  toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 </script>
+<button id="toTop" class="to-top" aria-label="返回顶部">↑</button>
 </body>
 </html>
