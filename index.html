@@ -373,23 +373,28 @@
     <div class="sec-head reveal">
       <div class="sec-tag">Agent Memory &amp; RAG</div>
       <h2>Agent 记忆方案 + RAG 效率</h2>
-      <p>知识扩展：除向量数据库外，Agent 记忆还能用哪些方案落地？RAG 又该怎么从提示词、检索、工程三层提效。下面这张对比图把方案与取舍一次讲清。</p>
+      <p>知识扩展：除向量数据库外，Agent 记忆还能用哪些方案落地？RAG 又该怎么从提示词、检索、工程三层提效。下面两张图把「方案取舍」与「提效抓手」一次讲清，并直接对应到已实跑的 W3 RAG 工程。</p>
     </div>
+
     <div class="demo-box reveal">
-      <svg viewBox="0 0 680 488" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Agent 记忆方案对比图，含四种替代方案、混合推荐与 RAG 效率要点">
+      <svg viewBox="0 0 680 372" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Agent 记忆方案对比图，含四种替代方案与混合推荐">
+        <style>
+          .mem-card .mc-bg { transition: stroke .2s, stroke-width .2s; }
+          .mem-card:hover .mc-bg { stroke: var(--accent); stroke-width: 1.5; }
+        </style>
         <text x="340" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="var(--text)">Agent 记忆方案对比</text>
         <text x="340" y="46" text-anchor="middle" font-size="13" fill="var(--text-soft)">除向量数据库外的替代方案及适用场景</text>
 
-        <g transform="translate(40,70)">
-          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+        <g class="mem-card" transform="translate(40,64)">
+          <rect class="mc-bg" width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
           <rect x="0" y="14" width="4" height="66" rx="2" fill="#378ADD"/>
           <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">SQLite / 关系型 DB</text>
           <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">结构化数据 · 精确查询</text>
           <text x="22" y="70" font-size="12.5" fill="var(--text-soft)">用户偏好、项目配置、订单记录</text>
           <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 快查询  ✗ 无语义检索</text>
         </g>
-        <g transform="translate(350,70)">
-          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+        <g class="mem-card" transform="translate(350,64)">
+          <rect class="mc-bg" width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
           <rect x="0" y="14" width="4" height="66" rx="2" fill="#1D9E75"/>
           <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">JSON 文件</text>
           <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">轻量 · Git 友好</text>
@@ -397,16 +402,16 @@
           <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 零依赖  ✗ 大文件慢</text>
         </g>
 
-        <g transform="translate(40,178)">
-          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+        <g class="mem-card" transform="translate(40,172)">
+          <rect class="mc-bg" width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
           <rect x="0" y="14" width="4" height="66" rx="2" fill="#7F77DD"/>
           <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">Redis / Memcached</text>
           <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">会话级 · 极低延迟</text>
           <text x="22" y="70" font-size="12.5" fill="var(--text-soft)">短期上下文、对话历史缓存</text>
           <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 极快  ✗ 数据易失</text>
         </g>
-        <g transform="translate(350,178)">
-          <rect width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+        <g class="mem-card" transform="translate(350,172)">
+          <rect class="mc-bg" width="290" height="94" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
           <rect x="0" y="14" width="4" height="66" rx="2" fill="#D85A30"/>
           <text x="22" y="32" font-size="14" font-weight="600" fill="var(--text)">知识图谱 (Graph DB)</text>
           <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">实体关系 · 精确推理</text>
@@ -414,17 +419,58 @@
           <text x="22" y="86" font-size="12" fill="var(--text-faint)">✓ 关联强  ✗ 构建贵</text>
         </g>
 
-        <g transform="translate(40,290)">
+        <g transform="translate(40,280)">
           <rect width="600" height="74" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1"/>
           <text x="22" y="32" font-size="14" font-weight="600" fill="var(--accent)">推荐：混合方案</text>
           <text x="22" y="52" font-size="12.5" fill="var(--text-soft)">向量库（语义检索）+ SQLite（结构化过滤）+ 知识图谱（实体关联）—— 兼顾灵活与精确</text>
         </g>
+      </svg>
+    </div>
 
-        <g transform="translate(40,384)" font-size="12.5">
-          <text x="0" y="6" font-size="13.5" font-weight="600" fill="var(--text)">RAG 效率优化三层</text>
-          <g transform="translate(0,22)"><circle cx="7" cy="5" r="4" fill="#1D9E75"/><text x="20" y="9" fill="var(--text-soft)">提示词：[Context] 分隔检索结果，Few-shot 示例，结构化输出，拒答机制</text></g>
-          <g transform="translate(0,42)"><circle cx="7" cy="5" r="4" fill="#378ADD"/><text x="20" y="9" fill="var(--text-soft)">检索：BM25 关键词 + 向量混合检索，Rerank 精排，多粒度切片</text></g>
-          <g transform="translate(0,62)"><circle cx="7" cy="5" r="4" fill="#BA7517"/><text x="20" y="9" fill="var(--text-soft)">工程：Query 缓存（TTL 1h–24h）、增量更新、异步预取</text></g>
+    <p class="reveal" style="font-size:14px;color:var(--text-soft);line-height:1.75;margin:22px 0 0;border-left:3px solid var(--accent-2);padding-left:14px;">这套记忆与检索思路已落地在 <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w3-rag-qa" style="color:var(--accent);font-weight:600;">W3 RAG 工程</a>：检索被封装为工具，模型自主 <code style="font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--border);padding:0 5px;border-radius:5px;color:var(--accent);">retrieve</code> 并带引用作答。下方「RAG 效率三层」即该工程的提效抓手——改 prompt / 检索策略后，用 W5 的评测护栏验证是否掉档。</p>
+
+    <div class="demo-box reveal" style="margin-top:22px;">
+      <svg viewBox="0 0 680 224" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RAG 效率优化三层：提示词层、检索层、工程层">
+        <style>
+          .rag-col .rc-bg { transition: stroke .2s, stroke-width .2s; }
+          .rag-col:hover .rc-bg { stroke: var(--accent); stroke-width: 1.5; }
+        </style>
+        <text x="340" y="26" text-anchor="middle" font-size="15" font-weight="600" fill="var(--text)">RAG 效率优化三层</text>
+
+        <g class="rag-col" transform="translate(40,52)">
+          <rect class="rc-bg" width="190" height="152" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+          <rect x="0" y="14" width="4" height="124" rx="2" fill="#1D9E75"/>
+          <text x="20" y="34" font-size="14" font-weight="600" fill="#1D9E75">提示词层</text>
+          <g font-size="12" fill="var(--text-soft)">
+            <g transform="translate(20,60)"><circle cx="3" cy="4" r="2.5" fill="#1D9E75"/><text x="13" y="8">[Context] 分隔结果</text></g>
+            <g transform="translate(20,82)"><circle cx="3" cy="4" r="2.5" fill="#1D9E75"/><text x="13" y="8">Few-shot 示例</text></g>
+            <g transform="translate(20,104)"><circle cx="3" cy="4" r="2.5" fill="#1D9E75"/><text x="13" y="8">结构化输出</text></g>
+            <g transform="translate(20,126)"><circle cx="3" cy="4" r="2.5" fill="#1D9E75"/><text x="13" y="8">拒答机制</text></g>
+          </g>
+        </g>
+
+        <g class="rag-col" transform="translate(245,52)">
+          <rect class="rc-bg" width="190" height="152" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+          <rect x="0" y="14" width="4" height="124" rx="2" fill="#378ADD"/>
+          <text x="20" y="34" font-size="14" font-weight="600" fill="#378ADD">检索层</text>
+          <g font-size="12" fill="var(--text-soft)">
+            <g transform="translate(20,60)"><circle cx="3" cy="4" r="2.5" fill="#378ADD"/><text x="13" y="8">BM25 + 向量混合</text></g>
+            <g transform="translate(20,82)"><circle cx="3" cy="4" r="2.5" fill="#378ADD"/><text x="13" y="8">Rerank 精排</text></g>
+            <g transform="translate(20,104)"><circle cx="3" cy="4" r="2.5" fill="#378ADD"/><text x="13" y="8">多粒度切片</text></g>
+            <g transform="translate(20,126)"><circle cx="3" cy="4" r="2.5" fill="#378ADD"/><text x="13" y="8">来源可视化</text></g>
+          </g>
+        </g>
+
+        <g class="rag-col" transform="translate(450,52)">
+          <rect class="rc-bg" width="190" height="152" rx="12" fill="var(--bg-card)" stroke="var(--border)"/>
+          <rect x="0" y="14" width="4" height="124" rx="2" fill="#BA7517"/>
+          <text x="20" y="34" font-size="14" font-weight="600" fill="#BA7517">工程层</text>
+          <g font-size="12" fill="var(--text-soft)">
+            <g transform="translate(20,60)"><circle cx="3" cy="4" r="2.5" fill="#BA7517"/><text x="13" y="8">Query 缓存</text></g>
+            <g transform="translate(20,82)"><circle cx="3" cy="4" r="2.5" fill="#BA7517"/><text x="13" y="8">增量更新</text></g>
+            <g transform="translate(20,104)"><circle cx="3" cy="4" r="2.5" fill="#BA7517"/><text x="13" y="8">异步预取</text></g>
+            <g transform="translate(20,126)"><circle cx="3" cy="4" r="2.5" fill="#BA7517"/><text x="13" y="8">TTL 1h–24h</text></g>
+          </g>
         </g>
       </svg>
     </div>
