@@ -27,6 +27,11 @@ learning-AI/
 ├── w6-portfolio/        ← 本目录（作品集站点 + 说明）
 │   ├── index.html       自包含作品集页面（导航 / 路线 / 作品 / 工程实践 / 录屏）
 │   ├── resume.html      简历页（A4 两页定稿，含 AI 能力章节；屏幕显示带纸张容器）
+│   ├── screencast-checklist.md  录屏执行清单（逐段画面 + 口播 + 命令）
+│   ├── scripts/
+│   │   ├── preflight.sh       录屏前一键自检（env / 依赖 / 端口 / 测试）
+│   │   ├── strip-node-ids.sh  清理可视化编辑器注入的 data-page-node-id 污染
+│   │   └── gen-eval-report.ts 评测报告生成
 │   └── README.md        你正在看的文件
 ├── w2-agent-chat/       流式聊天 + 工具调用（Express + React + AI SDK）
 ├── w3-rag-qa/           RAG 流式问答（Embedding + 内存向量库）
@@ -93,6 +98,18 @@ npm run eval       # 真实 LLM 评测，写出 eval-report.md（需 key）
   自定义上下文请用自建 Tracer 的 `event()` / span attributes 承载。
 
 ## 录屏脚本（3–5 分钟）
+
+**开录前先跑自检**（30 秒，检查四个工程的 key / 依赖 / 端口，并自动清掉 HTML 里的编辑器污染）：
+
+```bash
+cd w6-portfolio
+./scripts/preflight.sh            # 快速检查
+./scripts/preflight.sh --test     # 完整检查，额外跑四个工程的离线 npm test
+```
+
+阻塞项为 0 才开录；有 `✗` 就按脚本提示修（缺 `.env` / 缺依赖 / 端口被旧进程占）。
+另需确认：W5 走本地 Ollama，需要 `ollama serve` 在跑且已拉 `qwen2.5-coder:14b`
+（`ollama list` 核对）。
 
 见 `index.html` →「演示」一节，或按此顺序：
 
