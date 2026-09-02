@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { scanServices, previewAction, runAction } from './lib/api'
 import { ServiceCard } from './components/ServiceCard'
+import { PlaybookPanel } from './components/PlaybookPanel'
 import type {
   ActionPreview,
   RunActionResult,
@@ -49,6 +50,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [manage, setManage] = useState<ManageState | null>(null)
+  const [view, setView] = useState<'services' | 'playbooks'>('services')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -159,7 +161,13 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-ink-700 px-5 py-3">
+      <TabBar view={view} onChange={setView} />
+
+      {view === 'playbooks' ? (
+        <PlaybookPanel />
+      ) : (
+        <>
+          <header className="flex items-center justify-between border-b border-ink-700 px-5 py-3">
         <div className="flex items-baseline gap-3">
           <h1 className="text-sm font-semibold tracking-wide text-slate-100">
             Local Service Hub
@@ -259,6 +267,38 @@ export default function App() {
           onRescan={afterRunRescan}
         />
       )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function TabBar({
+  view,
+  onChange,
+}: {
+  view: 'services' | 'playbooks'
+  onChange: (v: 'services' | 'playbooks') => void
+}) {
+  const tabs: { id: 'services' | 'playbooks'; label: string }[] = [
+    { id: 'services', label: '服务' },
+    { id: 'playbooks', label: '诊断台' },
+  ]
+  return (
+    <div className="flex items-center gap-1 border-b border-ink-700 bg-ink-900 px-3 py-1.5">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          className={`rounded px-2.5 py-1 text-[11px] transition-colors ${
+            view === t.id
+              ? 'bg-ink-700 text-slate-100'
+              : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   )
 }

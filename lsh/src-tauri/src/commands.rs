@@ -1,12 +1,8 @@
 use std::collections::HashMap;
-use std::os::unix::process::CommandExt;
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
-use std::thread;
-use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+use crate::exec;
 use crate::model::{Action, ServiceManifest};
 use crate::registry;
 use crate::scanner::{self, PortEntry, SupervisionState};
@@ -386,7 +382,7 @@ pub fn run_action(
     let is_long_running = matches!(action.as_str(), "start" | "restart");
 
     if is_long_running {
-        match spawn_detached(prog, base_args, &r.cmd, &r.cwd, &r.env) {
+        match exec::spawn_detached(prog, base_args, &r.cmd, &r.cwd, &r.env) {
             Ok(pid) => Ok(RunActionResult {
                 service_id,
                 action,
@@ -427,7 +423,7 @@ pub fn run_action(
             }),
         }
     } else {
-        let outcome = run_blocking(prog, base_args, &r.cmd, &r.cwd, &r.env, r.act.timeout_ms);
+        let outcome = exec::run_blocking(prog, base_args, &r.cmd, &r.cwd, &r.env, r.act.timeout_ms);
         match outcome {
             Ok(o) => Ok(RunActionResult {
                 service_id,
@@ -478,94 +474,7 @@ pub fn run_action(
 ///
 /// 注意：macOS 没有 setsid 二进制，真正的 TTY 解耦由 manifest 的
 /// `script -q` / `perl POSIX::setsid` 包装负责；这里只保证 Rust 侧不卡住。
-fn spawn_detached(
-    prog: &str,
-    base_args: &[&str],
-    cmd: &str,
-    cwd: &str,
-    env: &HashMap<String, String>,
-) -> Result<u32, String> {
-    let mut command = Command::new(prog);
-    command
-        .args(base_args)
-        .arg(cmd)
-        .current_dir(cwd)
-        .envs(env.iter().map(|(k, v)| (k.clone(), v.clone())))
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    // 新进程组，尽量与 Tauri 进程解耦
-    command.process_group(0);
-
-    let child = command
-        .spawn()
-        .map_err(|e| format!("启动失败: {e}"))?;
-    Ok(child.id())
-}
-
-/// 限时执行一个短命令（stop/status/bootstrap），捕获合并后的 stdout+stderr。
-fn run_blocking(
-    prog: &str,
-    base_args: &[&str],
-    cmd: &str,
-    cwd: &str,
-    env: &HashMap<String, String>,
-    timeout_ms: u64,
-) -> Result<BlockOutcome, String> {
-    let mut command = Command::new(prog);
-    command
-        .args(base_args)
-        .arg(cmd)
-        .current_dir(cwd)
-        .envs(env.iter().map(|(k, v)| (k.clone(), v.clone())))
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let mut child = command
-        .spawn()
-        .map_err(|e| format!("执行失败: {e}"))?;
-
-    let deadline = Instant::now() + Duration::from_millis(timeout_ms.max(1000));
-    let mut timed_out = false;
-    loop {
-        match child
-            .try_wait()
-            .map_err(|e| format!("等待子进程失败: {e}"))?
-        {
-            Some(_) => break,
-            None => {
-                if Instant::now() >= deadline {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    timed_out = true;
-                    break;
-                }
-                thread::sleep(Duration::from_millis(100));
-            }
-        }
-    }
-
-    let out = child
-        .wait_with_output()
-        .map_err(|e| format!("读取命令输出失败: {e}"))?;
-    let code = out.status.code().unwrap_or(-1);
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    Ok(BlockOutcome {
-        code,
-        combined,
-        timed_out,
-    })
-}
-
-struct BlockOutcome {
-    code: i32,
-    combined: String,
-    timed_out: bool,
-}
+/// （实现见 crate::exec::spawn_detached）
 
 /// V0.1 的极简前置条件求值：只认 `supervised == true|false` 这一种形态。
 ///
@@ -579,6 +488,29 @@ fn eval_precondition(cond: &str, supervised: SupervisionState) -> bool {
         _ => return true, // 认不出来的条件一律放行，别把用户挡在门外
     };
     (supervised == SupervisionState::Supervised) == want
+}
+
+// ───────────────────────────── Playbook 引擎（V0.2：加载 / 匹配 / 只读诊断） ─────────────────────────────
+
+#[tauri::command]
+pub fn list_playbooks() -> Result<Vec<crate::pb::PlaybookSummary>, String> {
+    crate::pb::list_playbooks_meta()
+}
+
+#[tauri::command]
+pub fn match_playbooks(ctx: crate::pb::MatchContext) -> Result<Vec<crate::pb::MatchedPlaybook>, String> {
+    crate::pb::match_playbooks(&ctx)
+}
+
+#[tauri::command]
+pub fn diagnose_playbook(id: String) -> Result<crate::pb::DiagnoseResult, String> {
+    let pb = crate::pb::get_playbook(&id)?;
+    crate::pb::diagnose(&pb)
+}
+
+#[tauri::command]
+pub fn run_probes() -> Result<Vec<crate::pb::ProbeRun>, String> {
+    crate::pb::run_all_probes()
 }
 
 #[cfg(test)]

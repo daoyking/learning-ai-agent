@@ -1,0 +1,1477 @@
+//! Playbook 引擎（V0.2）：加载 + 触发匹配 + 只读诊断 + 结论推导。
+//!
+//! 安全模型（见 docs/PLAYBOOK-DSL.md）：
+//!   - 表达式语言是**白名单解析器**，绝不使用 eval / 任意运行时求值。
+//!   - diagnose 阶段每一步都只读（exec 只跑 SELECT/cat/echo 类；sqlite 用 readOnly）。
+//!   - V0.2 强制所有剧本按 manual 处理：只产出结论 + 证据链 + 修复命令，绝不代执行写操作。
+//!   - 触发匹配（match）不联网；真正跑探针只在用户显式触发的 diagnose / run_probes 里。
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::exec;
+use crate::registry;
+
+// ───────────────────────────── 解析结构体（对齐 playbook.schema.json） ─────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Playbook {
+    pub schema: String,
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub service: Option<String>,
+    #[serde(default = "default_severity")]
+    pub severity: String,
+    #[serde(default = "default_category")]
+    pub category: String,
+    #[serde(default)]
+    pub symptom: Option<String>,
+    pub trigger: Trigger,
+    pub diagnose: Vec<DiagnoseStep>,
+    pub conclude: Vec<ConclusionSpec>,
+    #[serde(default)]
+    pub fix: Option<Fix>,
+    #[serde(default)]
+    pub verify: Option<Verify>,
+    #[serde(default)]
+    pub rollback: Option<Rollback>,
+    #[serde(default = "default_risk")]
+    pub risk: String,
+    #[serde(default = "default_side_effect")]
+    pub side_effects: String,
+    #[serde(default)]
+    pub requires_sudo: bool,
+    #[serde(default)]
+    pub source: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Trigger {
+    #[serde(default)]
+    pub any_of: Vec<Condition>,
+    #[serde(default)]
+    pub all_of: Vec<Condition>,
+    #[serde(default = "default_cooldown")]
+    pub cooldown_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Condition {
+    #[serde(default)]
+    pub probe: Option<String>,
+    #[serde(default)]
+    pub when: Option<String>,
+    #[serde(default)]
+    pub log_match: Option<LogMatch>,
+    #[serde(default)]
+    pub cmd: Option<TriggerCmd>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogMatch {
+    #[serde(default)]
+    pub source: Option<String>,
+    pub pattern: String,
+    #[serde(default = "default_window")]
+    pub window: String,
+    #[serde(default = "default_count")]
+    pub count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TriggerCmd {
+    pub run: String,
+    #[serde(default)]
+    pub expect_exit: Option<i32>,
+    #[serde(default)]
+    pub expect_output: Option<String>,
+    #[serde(default)]
+    pub expect_not_output: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DiagnoseStep {
+    pub id: String,
+    pub title: String,
+    #[serde(default)]
+    pub exec: Option<ExecSpec>,
+    #[serde(default)]
+    pub read_file: Option<String>,
+    #[serde(default)]
+    pub sqlite_query: Option<SqliteQuery>,
+    #[serde(default)]
+    pub capture: Option<String>,
+    #[serde(default)]
+    pub optional: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecSpec {
+    pub cmd: String,
+    #[serde(default)]
+    pub cwd: Option<String>,
+    #[serde(default = "default_exec_timeout")]
+    pub timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SqliteQuery {
+    pub file: String,
+    pub sql: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConclusionSpec {
+    pub when: String,
+    pub root_cause: String,
+    #[serde(default = "default_confidence")]
+    pub confidence: String,
+    #[serde(default)]
+    pub evidence: Vec<String>,
+    #[serde(default)]
+    pub recommended_fix: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Fix {
+    #[serde(default = "default_fix_mode")]
+    pub mode: String,
+    #[serde(default = "default_true")]
+    pub confirm: bool,
+    #[serde(default)]
+    pub backup: Vec<String>,
+    #[serde(default)]
+    pub steps: Vec<FixStep>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FixStep {
+    pub id: String,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(rename = "type", default = "default_step_type")]
+    pub kind: String,
+    #[serde(default)]
+    pub cmd: Option<String>,
+    #[serde(default)]
+    pub cwd: Option<String>,
+    #[serde(default)]
+    pub file: Option<String>,
+    #[serde(default)]
+    pub sql: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub value: Option<serde_yaml::Value>,
+    #[serde(default)]
+    pub container: Option<String>,
+    #[serde(default)]
+    pub action: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default = "default_fixstep_timeout")]
+    pub timeout_ms: u64,
+    #[serde(default)]
+    pub instruction: Option<String>,
+    #[serde(default = "default_snapshot")]
+    pub snapshot: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Verify {
+    #[serde(default)]
+    pub probe: Option<String>,
+    #[serde(default)]
+    pub expect: Option<String>,
+    #[serde(default)]
+    pub cmd: Option<String>,
+    #[serde(default = "default_verify_timeout")]
+    pub timeout_ms: u64,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Rollback {
+    #[serde(default = "default_true")]
+    pub from_snapshot: bool,
+    #[serde(default)]
+    pub steps: Vec<FixStep>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+fn default_severity() -> String { "warn".into() }
+fn default_category() -> String { "config".into() }
+fn default_cooldown() -> u64 { 600_000 }
+fn default_window() -> String { "15m".into() }
+fn default_count() -> u32 { 1 }
+fn default_exec_timeout() -> u64 { 15_000 }
+fn default_confidence() -> String { "medium".into() }
+fn default_fix_mode() -> String { "manual".into() }
+fn default_true() -> bool { true }
+fn default_risk() -> String { "medium".into() }
+fn default_side_effect() -> String { "restart-service".into() }
+fn default_step_type() -> String { "exec".into() }
+fn default_fixstep_timeout() -> u64 { 30_000 }
+fn default_snapshot() -> bool { true }
+fn default_verify_timeout() -> u64 { 60_000 }
+
+// ───────────────────────────── 对外响应结构体（序列化给前端） ─────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaybookSummary {
+    pub id: String,
+    pub title: String,
+    pub service: Option<String>,
+    pub severity: String,
+    pub category: String,
+    pub symptom: Option<String>,
+    pub has_fix: bool,
+    pub risk: String,
+    pub requires_sudo: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MatchContext {
+    /// key = "service.probeId"，value = 探针输出的 JSON 对象（顶层 key 会被展开成变量）。
+    pub probe_vars: HashMap<String, Value>,
+    pub home: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchedPlaybook {
+    pub id: String,
+    pub title: String,
+    pub service: Option<String>,
+    pub severity: String,
+    pub category: String,
+    pub symptom: Option<String>,
+    pub trigger_summary: String,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagnoseStepOut {
+    pub id: String,
+    pub title: String,
+    pub cmd: Option<String>,
+    pub output: String,
+    pub exit: i32,
+    pub captured: Option<Value>,
+    pub error: Option<String>,
+    pub optional: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConclusionOut {
+    pub when: String,
+    pub root_cause: String,
+    pub confidence: String,
+    pub evidence: Vec<String>,
+    pub recommended_fix: Option<String>,
+    pub matched: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixStepPreview {
+    pub id: String,
+    pub title: String,
+    pub kind: String,
+    pub command: String,
+    pub snapshot: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixPreview {
+    pub mode: String,
+    pub confirm: bool,
+    pub risk: String,
+    pub side_effects: String,
+    pub requires_sudo: bool,
+    pub steps: Vec<FixStepPreview>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagnoseResult {
+    pub id: String,
+    pub title: String,
+    pub severity: String,
+    pub category: String,
+    pub symptom: Option<String>,
+    pub source: Option<String>,
+    pub steps: Vec<DiagnoseStepOut>,
+    pub vars: Value,
+    pub partial: bool,
+    pub conclusions: Vec<ConclusionOut>,
+    pub fix: Option<FixPreview>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProbeRun {
+    pub service: String,
+    pub probe: String,
+    pub ok: bool,
+    pub raw: String,
+    pub vars: Value,
+}
+
+// ───────────────────────────── 加载器 ─────────────────────────────
+
+pub fn playbook_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join("manifests")
+        .join("playbooks")
+}
+
+pub fn load_playbooks() -> Result<Vec<Playbook>, String> {
+    let dir = playbook_dir();
+    let mut out: Vec<Playbook> = Vec::new();
+    let mut failed: Vec<String> = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for e in entries.flatten() {
+            let p = e.path();
+            let ext = p.extension().and_then(|s| s.to_str()).unwrap_or("");
+            if ext != "yaml" && ext != "yml" {
+                continue;
+            }
+            let raw = std::fs::read_to_string(&p)
+                .map_err(|e| format!("读取 {} 失败: {e}", p.display()))?;
+            match serde_yaml::from_str::<Playbook>(&raw) {
+                Ok(pb) => out.push(pb),
+                Err(e) => failed.push(format!(
+                    "{}: {e}",
+                    p.file_name().and_then(|s| s.to_str()).unwrap_or("?")
+                )),
+            }
+        }
+    }
+
+    if out.is_empty() && !failed.is_empty() {
+        return Err(format!("所有剧本解析失败:\n{}", failed.join("\n")));
+    }
+    if !failed.is_empty() {
+        eprintln!(
+            "[lsh playbook] 跳过 {} 个解析失败的剧本:\n{}",
+            failed.len(),
+            failed.join("\n")
+        );
+    }
+    out.sort_by(|a, b| a.id.cmp(&b.id));
+    Ok(out)
+}
+
+pub fn get_playbook(id: &str) -> Result<Playbook, String> {
+    load_playbooks()?
+        .into_iter()
+        .find(|b| b.id == id)
+        .ok_or_else(|| format!("未找到剧本 {id}"))
+}
+
+pub fn list_playbooks_meta() -> Result<Vec<PlaybookSummary>, String> {
+    Ok(load_playbooks()?
+        .into_iter()
+        .map(|b| PlaybookSummary {
+            id: b.id,
+            title: b.title,
+            service: b.service,
+            severity: b.severity,
+            category: b.category,
+            symptom: b.symptom,
+            has_fix: b.fix.is_some(),
+            risk: b.risk,
+            requires_sudo: b.requires_sudo,
+        })
+        .collect())
+}
+
+// ───────────────────────────── 探针运行（联网，仅在显式触发的 diagnose / run_probes 里） ─────────────────────────────
+
+fn probe_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join("manifests")
+        .join("probes")
+}
+
+/// 运行单个 L3 探针脚本（node <script>），返回其末行 JSON 解析后的对象。
+pub fn run_probe(service: &str, probe: &str) -> Result<Value, String> {
+    let manifests = registry::load_manifests()?;
+    let m = manifests
+        .iter()
+        .find(|m| m.id == service)
+        .ok_or_else(|| format!("找不到服务 {service}"))?;
+    let l3 = m
+        .health
+        .l3
+        .iter()
+        .find(|p| p.id == probe)
+        .ok_or_else(|| format!("服务 {service} 无探针 {probe}"))?;
+    let script = l3
+        .script
+        .as_deref()
+        .ok_or_else(|| format!("探针 {probe} 未声明 script"))?;
+    let rel = script.trim_start_matches("probes/");
+    let path = probe_path().join(rel);
+
+    let out = exec::run_blocking("node", &[], &path.to_string_lossy().to_string(), ".", &HashMap::new(), 150_000)
+        .map_err(|e| format!("运行探针 {service}.{probe} 失败: {e}"))?;
+
+    parse_last_json(&out.combined)
+        .ok_or_else(|| format!("探针 {service}.{probe} 输出非 JSON: {}", out.combined.trim()))
+}
+
+fn parse_last_json(s: &str) -> Option<Value> {
+    for line in s.lines().filter(|l| !l.trim().is_empty()).rev() {
+        if let Ok(v) = serde_json::from_str::<Value>(line) {
+            return Some(v);
+        }
+    }
+    None
+}
+
+pub fn run_all_probes() -> Result<Vec<ProbeRun>, String> {
+    let manifests = registry::load_manifests()?;
+    let mut out = Vec::new();
+    for m in &manifests {
+        for p in &m.health.l3 {
+            match run_probe(&m.id, &p.id) {
+                Ok(v) => {
+                    let ok = v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
+                    out.push(ProbeRun {
+                        service: m.id.clone(),
+                        probe: p.id.clone(),
+                        ok,
+                        raw: serde_json::to_string(&v).unwrap_or_default(),
+                        vars: v,
+                    });
+                }
+                Err(e) => out.push(ProbeRun {
+                    service: m.id.clone(),
+                    probe: p.id.clone(),
+                    ok: false,
+                    raw: e,
+                    vars: Value::Null,
+                }),
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn flatten_top(obj: &Value) -> HashMap<String, Value> {
+    let mut m = HashMap::new();
+    if let Value::Object(o) = obj {
+        for (k, v) in o {
+            m.insert(k.clone(), v.clone());
+        }
+    }
+    m
+}
+
+// ───────────────────────────── 表达式语言（白名单 Pratt 解析器） ─────────────────────────────
+//
+// 6 种 AST 节点：Lit / Var / Unary / Binary / Call / Paren
+// 变量路径深度 ≤ 2（a 或 a.b）；callee 必须是内置白名单函数。
+
+#[derive(Debug, Clone)]
+enum ExprNode {
+    Lit(Value),
+    Var { base: String, field: Option<String> },
+    Unary { op: String, node: Box<ExprNode> },
+    Binary { op: String, left: Box<ExprNode>, right: Box<ExprNode> },
+    Call { name: String, args: Vec<ExprNode> },
+    Paren(Box<ExprNode>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum Tok {
+    Num(f64),
+    Str(String),
+    Ident(String),
+    Op(String),
+    LP,
+    RP,
+    Comma,
+    Dot,
+    LB,
+    RB,
+}
+
+fn lex(input: &str) -> Result<Vec<Tok>, String> {
+    let chars: Vec<char> = input.chars().collect();
+    let mut i = 0;
+    let mut toks = Vec::new();
+    while i < chars.len() {
+        let c = chars[i];
+        if c.is_whitespace() {
+            i += 1;
+            continue;
+        }
+        match c {
+            '(' => {
+                toks.push(Tok::LP);
+                i += 1;
+            }
+            ')' => {
+                toks.push(Tok::RP);
+                i += 1;
+            }
+            ',' => {
+                toks.push(Tok::Comma);
+                i += 1;
+            }
+            '.' => {
+                toks.push(Tok::Dot);
+                i += 1;
+            }
+            '[' => {
+                toks.push(Tok::LB);
+                i += 1;
+            }
+            ']' => {
+                toks.push(Tok::RB);
+                i += 1;
+            }
+            '\'' => {
+                i += 1;
+                let mut s = String::new();
+                while i < chars.len() {
+                    let ch = chars[i];
+                    if ch == '\\' && i + 1 < chars.len() {
+                        let n = chars[i + 1];
+                        s.push(match n {
+                            'n' => '\n',
+                            't' => '\t',
+                            'r' => '\r',
+                            '\\' => '\\',
+                            '\'' => '\'',
+                            other => other,
+                        });
+                        i += 2;
+                        continue;
+                    }
+                    if ch == '\'' {
+                        i += 1;
+                        break;
+                    }
+                    s.push(ch);
+                    i += 1;
+                }
+                toks.push(Tok::Str(s));
+            }
+            '=' => {
+                if i + 1 < chars.len() && chars[i + 1] == '=' {
+                    toks.push(Tok::Op("==".into()));
+                    i += 2;
+                } else {
+                    return Err("expr 语法错误：孤立的 '='（比较请用 ==）".into());
+                }
+            }
+            '!' => {
+                if i + 1 < chars.len() && chars[i + 1] == '=' {
+                    toks.push(Tok::Op("!=".into()));
+                    i += 2;
+                } else {
+                    return Err("expr 语法错误：孤立的 '!'（比较请用 !=）".into());
+                }
+            }
+            '>' => {
+                if i + 1 < chars.len() && chars[i + 1] == '=' {
+                    toks.push(Tok::Op(">=".into()));
+                    i += 2;
+                } else {
+                    toks.push(Tok::Op(">".into()));
+                    i += 1;
+                }
+            }
+            '<' => {
+                if i + 1 < chars.len() && chars[i + 1] == '=' {
+                    toks.push(Tok::Op("<=".into()));
+                    i += 2;
+                } else {
+                    toks.push(Tok::Op("<".into()));
+                    i += 1;
+                }
+            }
+            _ => {
+                if c.is_ascii_digit() || (c == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit())
+                {
+                    let start = i;
+                    if c == '-' {
+                        i += 1;
+                    }
+                    while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
+                        i += 1;
+                    }
+                    let numstr: String = chars[start..i].iter().collect();
+                    let n: f64 = numstr
+                        .parse()
+                        .map_err(|_| format!("非法数字 {numstr}"))?;
+                    toks.push(Tok::Num(n));
+                } else if c.is_alphabetic() || c == '_' || c == ':' {
+                    let start = i;
+                    while i < chars.len()
+                        && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == ':')
+                    {
+                        i += 1;
+                    }
+                    let id: String = chars[start..i].iter().collect();
+                    toks.push(Tok::Ident(id));
+                } else {
+                    return Err(format!("expr 词法错误：无法识别的字符 '{c}'"));
+                }
+            }
+        }
+    }
+    Ok(toks)
+}
+
+struct Parser {
+    toks: Vec<Tok>,
+    pos: usize,
+}
+
+impl Parser {
+    fn peek(&self) -> Option<&Tok> {
+        self.toks.get(self.pos)
+    }
+    fn bump(&mut self) -> Option<Tok> {
+        let t = self.toks.get(self.pos).cloned();
+        if t.is_some() {
+            self.pos += 1;
+        }
+        t
+    }
+
+    fn parse_program(&mut self) -> Result<ExprNode, String> {
+        let node = self.parse_or()?;
+        if self.pos != self.toks.len() {
+            return Err(format!("expr 多余 token：{:?}", self.peek()));
+        }
+        Ok(node)
+    }
+
+    fn parse_or(&mut self) -> Result<ExprNode, String> {
+        let mut left = self.parse_and()?;
+        loop {
+            let op = match self.peek() {
+                Some(Tok::Ident(o)) if o == "or" => o.clone(),
+                _ => break,
+            };
+            self.bump();
+            let right = self.parse_and()?;
+            left = ExprNode::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+        Ok(left)
+    }
+
+    fn parse_and(&mut self) -> Result<ExprNode, String> {
+        let mut left = self.parse_unary()?;
+        loop {
+            let op = match self.peek() {
+                Some(Tok::Ident(o)) if o == "and" => o.clone(),
+                _ => break,
+            };
+            self.bump();
+            let right = self.parse_unary()?;
+            left = ExprNode::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+        Ok(left)
+    }
+
+    fn parse_unary(&mut self) -> Result<ExprNode, String> {
+        let op = match self.peek() {
+            Some(Tok::Ident(o)) if o == "not" => o.clone(),
+            _ => return self.parse_cmp(),
+        };
+        self.bump();
+        let node = self.parse_unary()?;
+        Ok(ExprNode::Unary {
+            op,
+            node: Box::new(node),
+        })
+    }
+
+    fn parse_cmp(&mut self) -> Result<ExprNode, String> {
+        let left = self.parse_primary()?;
+        if let Some(Tok::Op(op)) = self.peek() {
+            let op = op.clone();
+            self.bump();
+            let right = self.parse_primary()?;
+            Ok(ExprNode::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            })
+        } else {
+            Ok(left)
+        }
+    }
+
+    fn parse_primary(&mut self) -> Result<ExprNode, String> {
+        match self.peek().cloned() {
+            Some(Tok::LP) => {
+                self.bump();
+                let n = self.parse_or()?;
+                match self.bump() {
+                    Some(Tok::RP) => Ok(ExprNode::Paren(Box::new(n))),
+                    _ => Err("expr 缺少右括号 ')'".into()),
+                }
+            }
+            Some(Tok::Num(n)) => {
+                self.bump();
+                Ok(ExprNode::Lit(Value::Number(
+                    serde_json::Number::from_f64(n).unwrap_or(serde_json::Number::from(0)),
+                )))
+            }
+            Some(Tok::Str(s)) => {
+                self.bump();
+                Ok(ExprNode::Lit(Value::String(s)))
+            }
+            Some(Tok::Ident(id)) => {
+                self.bump();
+                match id.as_str() {
+                    "true" => return Ok(ExprNode::Lit(Value::Bool(true))),
+                    "false" => return Ok(ExprNode::Lit(Value::Bool(false))),
+                    "null" => return Ok(ExprNode::Lit(Value::Null)),
+                    _ => {}
+                }
+                if let Some(Tok::LP) = self.peek() {
+                    self.bump();
+                    let mut args = Vec::new();
+                    if !matches!(self.peek(), Some(Tok::RP)) {
+                        loop {
+                            args.push(self.parse_or()?);
+                            match self.peek().cloned() {
+                                Some(Tok::Comma) => {
+                                    self.bump();
+                                }
+                                Some(Tok::RP) => break,
+                                _ => return Err("函数参数缺少 ',' 或 ')'".into()),
+                            }
+                        }
+                    }
+                    self.bump();
+                    return Ok(ExprNode::Call { name: id, args });
+                }
+                let mut field = None;
+                if let Some(Tok::Dot) = self.peek() {
+                    self.bump();
+                    match self.bump() {
+                        Some(Tok::Ident(f)) => field = Some(f),
+                        _ => return Err("变量后 '.' 需要字段名".into()),
+                    }
+                    // 深度 > 2 直接拒绝（白名单约束）
+                    if let Some(Tok::Dot) = self.peek() {
+                        return Err("变量路径深度超过 2（白名单限制：只支持 a 或 a.b）".into());
+                    }
+                }
+                Ok(ExprNode::Var { base: id, field })
+            }
+            Some(Tok::LB) => {
+                self.bump();
+                let mut items = Vec::new();
+                if !matches!(self.peek(), Some(Tok::RB)) {
+                    loop {
+                        let e = self.parse_or()?;
+                        let v = eval_node(&e, &HashMap::new())?;
+                        items.push(v);
+                        match self.peek().cloned() {
+                            Some(Tok::Comma) => {
+                                self.bump();
+                            }
+                            Some(Tok::RB) => break,
+                            _ => return Err("数组字面量缺少 ',' 或 ']'".into()),
+                        }
+                    }
+                }
+                self.bump();
+                Ok(ExprNode::Lit(Value::Array(items)))
+            }
+            Some(t) => Err(format!("expr 解析错误：意外的 token {t:?}")),
+            None => Err("expr 意外结束".into()),
+        }
+    }
+}
+
+fn eval_expr(s: &str, vars: &HashMap<String, Value>) -> Result<Value, String> {
+    let toks = lex(s)?;
+    let mut p = Parser { toks, pos: 0 };
+    let node = p.parse_program()?;
+    eval_node(&node, vars)
+}
+
+fn eval_node(node: &ExprNode, vars: &HashMap<String, Value>) -> Result<Value, String> {
+    match node {
+        ExprNode::Lit(v) => Ok(v.clone()),
+        ExprNode::Paren(n) => eval_node(n, vars),
+        ExprNode::Var { base, field } => {
+            if base.contains(':') {
+                let key = base.split_once(':').map(|(_, k)| k).unwrap_or(base);
+                return Ok(Value::String(std::env::var(key).unwrap_or_default()));
+            }
+            let mut val = vars.get(base).cloned().unwrap_or(Value::Null);
+            if let Some(f) = field {
+                val = match &val {
+                    Value::Object(m) => m.get(f).cloned().unwrap_or(Value::Null),
+                    Value::Array(a) => {
+                        if let Ok(idx) = f.parse::<usize>() {
+                            a.get(idx).cloned().unwrap_or(Value::Null)
+                        } else {
+                            Value::Null
+                        }
+                    }
+                    _ => Value::Null,
+                };
+            }
+            Ok(val)
+        }
+        ExprNode::Unary { op, node } => {
+            let v = eval_node(node, vars)?;
+            match op.as_str() {
+                "not" => Ok(Value::Bool(!truthy(&v))),
+                other => Err(format!("未知一元运算符 {other}")),
+            }
+        }
+        ExprNode::Binary { op, left, right } => {
+            if op == "and" {
+                let l = eval_node(left, vars)?;
+                if !truthy(&l) {
+                    return Ok(Value::Bool(false));
+                }
+                let r = eval_node(right, vars)?;
+                return Ok(Value::Bool(truthy(&r)));
+            }
+            if op == "or" {
+                let l = eval_node(left, vars)?;
+                if truthy(&l) {
+                    return Ok(Value::Bool(true));
+                }
+                let r = eval_node(right, vars)?;
+                return Ok(Value::Bool(truthy(&r)));
+            }
+            let l = eval_node(left, vars)?;
+            let r = eval_node(right, vars)?;
+            match op.as_str() {
+                "==" | "!=" => {
+                    let eq = values_equal(&l, &r);
+                    Ok(Value::Bool(if op == "==" { eq } else { !eq }))
+                }
+                ">" | ">=" | "<" | "<=" => eval_ord(&l, &r, op),
+                "in" => match &r {
+                    Value::Array(arr) => Ok(Value::Bool(arr.iter().any(|e| values_equal(e, &l)))),
+                    _ => Err("in 运算符右侧必须是数组字面量".into()),
+                },
+                "matches" => {
+                    let s = match &l {
+                        Value::String(s) => s.clone(),
+                        _ => return Err("matches 左侧必须是字符串".into()),
+                    };
+                    let pat = match &r {
+                        Value::String(s) => s.clone(),
+                        _ => return Err("matches 右侧必须是字符串".into()),
+                    };
+                    let re = Regex::new(&pat).map_err(|e| format!("正则错误: {e}"))?;
+                    Ok(Value::Bool(re.is_match(&s)))
+                }
+                other => Err(format!("未知运算符 {other}")),
+            }
+        }
+        ExprNode::Call { name, args } => eval_call(name, args, vars),
+    }
+}
+
+fn eval_call(name: &str, args: &[ExprNode], vars: &HashMap<String, Value>) -> Result<Value, String> {
+    match name {
+        "len" | "count" | "exists" | "age_minutes" => {
+            if args.len() != 1 {
+                return Err(format!("{name} 需要 1 个参数"));
+            }
+            let v = eval_node(&args[0], vars)?;
+            Ok(match name {
+                "len" => Value::Number(num(len_of(&v) as f64)),
+                "count" => Value::Number(num(if truthy(&v) {
+                    if let Value::Array(a) = &v {
+                        a.len()
+                    } else {
+                        1
+                    }
+                } else {
+                    0
+                } as f64)),
+                "exists" => Value::Bool(truthy(&v)),
+                "age_minutes" => {
+                    let n = to_num(&v).unwrap_or(0.0);
+                    let now = now_ms() as f64;
+                    Value::Number(num(((now - n) / 60000.0).max(0.0)))
+                }
+                _ => Value::Null,
+            })
+        }
+        "contains" => {
+            if args.len() != 2 {
+                return Err("contains 需要 2 个参数".into());
+            }
+            let c = eval_node(&args[0], vars)?;
+            let item = eval_node(&args[1], vars)?;
+            Ok(Value::Bool(contains_val(&c, &item)))
+        }
+        other => Err(format!("未知函数 {other}（白名单之外，拒绝执行）")),
+    }
+}
+
+fn num(f: f64) -> serde_json::Number {
+    serde_json::Number::from_f64(f).unwrap_or(serde_json::Number::from(0))
+}
+
+fn to_num(v: &Value) -> Option<f64> {
+    match v {
+        Value::Number(n) => n.as_f64(),
+        Value::String(s) => s.trim().parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+fn truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().map(|x| x != 0.0).unwrap_or(false),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(a) => !a.is_empty(),
+        Value::Object(o) => !o.is_empty(),
+    }
+}
+
+fn values_equal(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::Null, Value::Null) => true,
+        _ => {
+            if let (Some(x), Some(y)) = (to_num(a), to_num(b)) {
+                return (x - y).abs() < 1e-9;
+            }
+            if let (Value::String(x), Value::String(y)) = (a, b) {
+                return x == y;
+            }
+            false
+        }
+    }
+}
+
+fn eval_ord(l: &Value, r: &Value, op: &str) -> Result<Value, String> {
+    match (to_num(l), to_num(r)) {
+        (Some(x), Some(y)) => Ok(Value::Bool(match op {
+            ">" => x > y,
+            ">=" => x >= y,
+            "<" => x < y,
+            "<=" => x <= y,
+            _ => false,
+        })),
+        _ => Err(format!("无法对 {l} {op} {r} 做大小比较（需要数字）")),
+    }
+}
+
+fn len_of(v: &Value) -> usize {
+    match v {
+        Value::String(s) => s.chars().count(),
+        Value::Array(a) => a.len(),
+        Value::Object(o) => o.len(),
+        _ => 0,
+    }
+}
+
+fn contains_val(container: &Value, item: &Value) -> bool {
+    match container {
+        Value::String(s) => match item {
+            Value::String(sub) => s.contains(sub.as_str()),
+            _ => false,
+        },
+        Value::Array(a) => a.iter().any(|e| values_equal(e, item)),
+        Value::Object(o) => match item {
+            Value::String(k) => o.contains_key(k),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+// ───────────────────────────── 触发匹配（不联网） ─────────────────────────────
+
+fn eval_condition(c: &Condition, ctx: &MatchContext) -> Result<bool, String> {
+    if let Some(probe) = &c.probe {
+        match ctx.probe_vars.get(probe) {
+            Some(obj) => {
+                let scope = flatten_top(obj);
+                match &c.when {
+                    Some(w) => eval_expr(w, &scope).map(|v| truthy(&v)),
+                    None => Ok(true),
+                }
+            }
+            None => Err(format!("缺少探针结果：{probe}（请先 run_probes）")),
+        }
+    } else if let Some(cmd) = &c.cmd {
+        let expanded = registry::expand(&cmd.run, Some(&ctx.home));
+        let (prog, base) = exec::split_shell("/bin/zsh -lc");
+        let out = exec::run_blocking(prog, &base, &expanded, ".", &HashMap::new(), 15_000)
+            .map_err(|e| format!("执行 cmd 触发失败: {e}"))?;
+        let mut scope: HashMap<String, Value> = HashMap::new();
+        scope.insert("exit".into(), Value::Number(num(out.code as f64)));
+        scope.insert("out".into(), Value::String(out.combined.clone()));
+        scope.insert("ok".into(), Value::Bool(out.code == 0));
+        match &c.when {
+            Some(w) => eval_expr(w, &scope).map(|v| truthy(&v)),
+            None => {
+                let mut ok = true;
+                if let Some(ex) = cmd.expect_exit {
+                    ok = ok && out.code == ex;
+                }
+                if let Some(pat) = &cmd.expect_output {
+                    ok = ok && out.combined.contains(pat);
+                }
+                if let Some(pat) = &cmd.expect_not_output {
+                    ok = ok && !out.combined.contains(pat);
+                }
+                Ok(ok)
+            }
+        }
+    } else if c.log_match.is_some() {
+        Err("log_match 需要实时日志流，V0.2 暂不支持".into())
+    } else {
+        Err("触发条件缺少 probe / cmd / log_match".into())
+    }
+}
+
+pub fn match_playbooks(ctx: &MatchContext) -> Result<Vec<MatchedPlaybook>, String> {
+    let books = load_playbooks()?;
+    let mut out = Vec::new();
+    for b in &books {
+        let (triggers, mode_any) = if !b.trigger.any_of.is_empty() {
+            (&b.trigger.any_of, true)
+        } else {
+            (&b.trigger.all_of, false)
+        };
+
+        if triggers.is_empty() {
+            continue; // 空触发器只能手动触发，不进入自动匹配
+        }
+
+        let mut results: Vec<Result<bool, String>> = Vec::new();
+        for c in triggers {
+            results.push(eval_condition(c, ctx));
+        }
+        let combined = if mode_any {
+            results.iter().any(|r| matches!(r, Ok(true)))
+        } else {
+            results.iter().all(|r| matches!(r, Ok(true)))
+        };
+
+        if combined {
+            let notes = results
+                .iter()
+                .filter_map(|r| r.as_ref().err().cloned())
+                .collect();
+            out.push(MatchedPlaybook {
+                id: b.id.clone(),
+                title: b.title.clone(),
+                service: b.service.clone(),
+                severity: b.severity.clone(),
+                category: b.category.clone(),
+                symptom: b.symptom.clone(),
+                trigger_summary: summarize_trigger(b),
+                notes,
+            });
+        }
+    }
+    out.sort_by(|a, b| sev_rank(&b.severity).cmp(&sev_rank(&a.severity)));
+    Ok(out)
+}
+
+fn sev_rank(s: &str) -> u8 {
+    match s {
+        "critical" => 0,
+        "high" => 1,
+        "warn" => 2,
+        "info" => 3,
+        _ => 4,
+    }
+}
+
+fn summarize_trigger(b: &Playbook) -> String {
+    let mut parts = Vec::new();
+    for c in b.trigger.any_of.iter().chain(b.trigger.all_of.iter()) {
+        if let Some(w) = &c.when {
+            parts.push(w.clone());
+        } else if let Some(p) = &c.probe {
+            parts.push(format!("probe:{p}"));
+        } else if c.cmd.is_some() {
+            parts.push("cmd".into());
+        } else if c.log_match.is_some() {
+            parts.push("log_match".into());
+        }
+    }
+    parts.join(" / ")
+}
+
+// ───────────────────────────── 只读诊断 + 结论推导 ─────────────────────────────
+
+fn run_diagnose_step(
+    step: &DiagnoseStep,
+    vars: &mut HashMap<String, Value>,
+    home: &str,
+) -> Result<DiagnoseStepOut, String> {
+    let mut ds = DiagnoseStepOut {
+        id: step.id.clone(),
+        title: step.title.clone(),
+        cmd: None,
+        output: String::new(),
+        exit: 0,
+        captured: None,
+        error: None,
+        optional: step.optional,
+    };
+
+    if let Some(exec_spec) = &step.exec {
+        let cmd = registry::expand(&exec_spec.cmd, Some(home));
+        let cwd = exec_spec
+            .cwd
+            .as_deref()
+            .map(|c| registry::expand(c, Some(home)))
+            .unwrap_or_else(|| home.to_string());
+        let (prog, base) = exec::split_shell("/bin/zsh -lc");
+        let out = exec::run_blocking(
+            prog,
+            &base,
+            &cmd,
+            &cwd,
+            &HashMap::new(),
+            exec_spec.timeout_ms.max(1000),
+        )
+        .map_err(|e| format!("执行失败: {e}"))?;
+        ds.cmd = Some(cmd);
+        ds.output = out.combined.clone();
+        ds.exit = out.code;
+        if !out.combined.trim().is_empty() {
+            let cap = Value::String(out.combined.trim().to_string());
+            ds.captured = Some(cap.clone());
+            vars.insert(capture_name(step), cap);
+        }
+        Ok(ds)
+    } else if let Some(sq) = &step.sqlite_query {
+        let file = registry::expand(&sq.file, Some(home));
+        let file_json =
+            serde_json::to_string(&file).map_err(|e| format!("序列化路径失败: {e}"))?;
+        let sql_json = serde_json::to_string(&sq.sql).map_err(|e| format!("序列化 SQL 失败: {e}"))?;
+        let script = format!(
+            "const {{DatabaseSync}}=require('node:sqlite');try{{const db=new DatabaseSync({},{{readOnly:true}});const rows=db.prepare({}).all();console.log('__LSH_SQL__'+JSON.stringify({{rows}}));}}catch(e){{console.log('__LSH_SQL_ERR__'+e.message);}}",
+            file_json, sql_json
+        );
+        let out = exec::run_node_argv(&script, &[], home, 15_000)
+            .map_err(|e| format!("运行 sqlite 查询失败: {e}"))?;
+        let cap = if let Some(idx) = out.combined.find("__LSH_SQL__") {
+            let js = &out.combined[idx + 11..];
+            match serde_json::from_str::<Value>(js.trim()) {
+                Ok(v) => v.get("rows").cloned().unwrap_or(Value::Array(vec![])),
+                Err(_) => Value::String(js.to_string()),
+            }
+        } else if let Some(idx) = out.combined.find("__LSH_SQL_ERR__") {
+            Value::String(format!("SQL 错误: {}", &out.combined[idx + 15..]))
+        } else {
+            Value::String(out.combined.clone())
+        };
+        ds.captured = Some(cap.clone());
+        vars.insert(capture_name(step), cap);
+        ds.output = out.combined.clone();
+        Ok(ds)
+    } else if let Some(rf) = &step.read_file {
+        let path = registry::expand(rf, Some(home));
+        let content = std::fs::read_to_string(&path).map_err(|e| format!("读取 {} 失败: {e}", path))?;
+        let cap = Value::String(content.clone());
+        ds.captured = Some(cap.clone());
+        vars.insert(capture_name(step), cap);
+        ds.output = format!("read {} ({} bytes)", path, content.len());
+        Ok(ds)
+    } else {
+        Err("诊断步骤未声明 exec / sqlite_query / read_file".into())
+    }
+}
+
+fn capture_name(step: &DiagnoseStep) -> String {
+    step.capture.clone().unwrap_or_else(|| step.id.clone())
+}
+
+pub fn diagnose(pb: &Playbook) -> Result<DiagnoseResult, String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let mut vars: HashMap<String, Value> = HashMap::new();
+    let mut steps_out = Vec::new();
+    let mut partial = false;
+
+    // 1) 合并触发器里引用的探针变量（如 conclude 需用到的 live）
+    for c in pb.trigger.any_of.iter().chain(pb.trigger.all_of.iter()) {
+        if let Some(p) = &c.probe {
+            if let Some((svc, probe)) = p.split_once('.') {
+                if let Ok(obj) = run_probe(svc, probe) {
+                    for (k, v) in flatten_top(&obj) {
+                        vars.insert(k, v);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2) 只读诊断步骤
+    for step in &pb.diagnose {
+        match run_diagnose_step(step, &mut vars, &home) {
+            Ok(s) => steps_out.push(s),
+            Err(e) => {
+                if step.optional {
+                    partial = true;
+                    steps_out.push(DiagnoseStepOut {
+                        id: step.id.clone(),
+                        title: step.title.clone(),
+                        cmd: None,
+                        output: String::new(),
+                        exit: 0,
+                        captured: None,
+                        error: Some(e),
+                        optional: step.optional,
+                    });
+                } else {
+                    return Err(format!("诊断步骤 {} 失败: {}", step.id, e));
+                }
+            }
+        }
+    }
+
+    let conclusions = conclude(pb, &vars);
+    let fix = fix_preview(pb);
+
+    Ok(DiagnoseResult {
+        id: pb.id.clone(),
+        title: pb.title.clone(),
+        severity: pb.severity.clone(),
+        category: pb.category.clone(),
+        symptom: pb.symptom.clone(),
+        source: pb.source.clone(),
+        steps: steps_out,
+        vars: serde_json::to_value(&vars).unwrap_or(Value::Null),
+        partial,
+        conclusions,
+        fix,
+    })
+}
+
+fn conclude(pb: &Playbook, vars: &HashMap<String, Value>) -> Vec<ConclusionOut> {
+    pb.conclude
+        .iter()
+        .map(|c| {
+            let matched = eval_expr(&c.when, vars).map(|v| truthy(&v)).unwrap_or(false);
+            ConclusionOut {
+                when: c.when.clone(),
+                root_cause: c.root_cause.clone(),
+                confidence: c.confidence.clone(),
+                evidence: c.evidence.clone(),
+                recommended_fix: c.recommended_fix.clone(),
+                matched,
+            }
+        })
+        .collect()
+}
+
+fn yaml_value_to_string(v: &Option<serde_yaml::Value>) -> String {
+    match v {
+        Some(serde_yaml::Value::String(s)) => s.clone(),
+        Some(other) => serde_yaml::to_string(other)
+            .unwrap_or_default()
+            .trim()
+            .to_string(),
+        None => String::new(),
+    }
+}
+
+fn fix_preview(pb: &Playbook) -> Option<FixPreview> {
+    let fix = pb.fix.as_ref()?;
+    let mut steps = Vec::new();
+    for s in &fix.steps {
+        let command = match s.kind.as_str() {
+            "exec" => s.cmd.clone().unwrap_or_default(),
+            "sqlite_update" => format!("SQL: {}", s.sql.clone().unwrap_or_default()),
+            "yaml_set" => format!(
+                "设置 {} = {}",
+                s.path.clone().unwrap_or_default(),
+                yaml_value_to_string(&s.value)
+            ),
+            "file_write" => format!(
+                "写入文件 {}: {}",
+                s.file.clone().unwrap_or_default(),
+                yaml_value_to_string(&s.value)
+            ),
+            "docker" => format!(
+                "docker {} {}",
+                s.action.clone().unwrap_or_default(),
+                s.container.clone().unwrap_or_default()
+            ),
+            "launchctl" => format!(
+                "launchctl {} {}",
+                s.action.clone().unwrap_or_default(),
+                s.label.clone().unwrap_or_default()
+            ),
+            "manual" => s.instruction.clone().unwrap_or_default(),
+            _ => String::new(),
+        };
+        steps.push(FixStepPreview {
+            id: s.id.clone(),
+            title: s.title.clone().unwrap_or_default(),
+            kind: s.kind.clone(),
+            command,
+            snapshot: s.snapshot,
+        });
+    }
+    Some(FixPreview {
+        mode: fix.mode.clone(),
+        confirm: fix.confirm,
+        risk: pb.risk.clone(),
+        side_effects: pb.side_effects.clone(),
+        requires_sudo: pb.requires_sudo,
+        steps,
+    })
+}
+
+// ───────────────────────────── 测试 ─────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn vars(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
+        pairs.iter().map(|(k, v)| ((*k).to_string(), v.clone())).collect()
+    }
+
+    #[test]
+    fn expr_comparisons_and_coercion() {
+        // 数字比较
+        let v = vars(&[("live", serde_json::json!(0)), ("total", serde_json::json!(8))]);
+        assert!(truthy(&eval_expr("live == 0", &v).unwrap()));
+        assert!(truthy(&eval_expr("total > 5", &v).unwrap()));
+        assert!(truthy(&eval_expr("live != 1", &v).unwrap()));
+        // 字符串 "0" 与数字 0 应判等（捕获量多为字符串）
+        let v2 = vars(&[("proxy_listeners", Value::String("0".into()))]);
+        assert!(truthy(&eval_expr("proxy_listeners == 0", &v2).unwrap()));
+    }
+
+    #[test]
+    fn expr_logical_and_not_contains() {
+        let v = vars(&[
+            ("default_lang", Value::String("all".into())),
+            ("results", serde_json::json!(0)),
+        ]);
+        assert!(truthy(
+            &eval_expr("not contains(default_lang, 'en-US')", &v).unwrap()
+        ));
+        assert!(truthy(&eval_expr("results == 0", &v).unwrap()));
+        // 短路：and 一侧 false
+        assert!(!truthy(
+            &eval_expr("false and results == 0", &v).unwrap()
+        ));
+    }
+
+    #[test]
+    fn expr_var_depth_limit_and_whitelist() {
+        // 深度 2 允许
+        let v = vars(&[("results", serde_json::json!({"count": 3}))]);
+        assert!(truthy(&eval_expr("results.count == 3", &v).unwrap()));
+        // 深度 3 必须拒绝
+        assert!(eval_expr("a.b.c == 1", &v).is_err());
+        // 未知函数必须拒绝（白名单之外 = 潜在后门）
+        assert!(eval_expr("system('rm -rf /')", &v).is_err());
+    }
+
+    #[test]
+    fn expr_functions() {
+        let v = vars(&[("proxy_rows", Value::String("proxy_enabled=1".into()))]);
+        assert!(truthy(&eval_expr("contains(proxy_rows, 'proxy_enabled')", &v).unwrap()));
+        assert!(truthy(&eval_expr("len('hello') == 5", &v).unwrap()));
+    }
+
+    #[test]
+    fn loader_parses_all_playbooks() {
+        let books = load_playbooks().expect("加载剧本失败");
+        // 仓库内置 13 个剧本
+        assert_eq!(books.len(), 13, "应有 13 个剧本，实际 {:?}", books.len());
+        // 关键剧本必须在
+        for id in [
+            "omniroute-ghost-proxy",
+            "searxng-no-result",
+            "host-frozen",
+            "dsh-duplicate-loader",
+        ] {
+            assert!(books.iter().any(|b| b.id == id), "缺少剧本 {id}");
+        }
+    }
+
+    #[test]
+    fn matcher_uses_injected_probe_vars() {
+        // 不联网：直接注入探针结果
+        let mut probe_vars = HashMap::new();
+        probe_vars.insert(
+            "omniroute.providers-live".into(),
+            serde_json::json!({"live": 0, "total": 35, "proxy_alive": false}),
+        );
+        probe_vars.insert(
+            "searxng.search-returns-results".into(),
+            serde_json::json!({"localized": true, "results": 3}),
+        );
+        let ctx = MatchContext {
+            probe_vars,
+            home: std::env::var("HOME").unwrap_or_default(),
+        };
+        let matched = match_playbooks(&ctx).expect("匹配失败");
+        let ids: Vec<&str> = matched.iter().map(|m| m.id.as_str()).collect();
+        assert!(
+            ids.contains(&"omniroute-ghost-proxy"),
+            "应匹配幽灵代理剧本，实际 {ids:?}"
+        );
+        assert!(
+            ids.contains(&"searxng-no-result"),
+            "应匹配 searxng 本地化剧本，实际 {ids:?}"
+        );
+    }
+}

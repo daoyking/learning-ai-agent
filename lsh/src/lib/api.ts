@@ -1,5 +1,15 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { ActionPreview, PortEntry, RunActionResult, ScanResult } from '../types'
+import type {
+  ActionPreview,
+  MatchContext,
+  PlaybookSummary,
+  DiagnoseResult,
+  MatchedPlaybook,
+  ProbeRun,
+  PortEntry,
+  RunActionResult,
+  ScanResult,
+} from '../types'
 
 /** 自己判定，避免依赖特定版本的导出符号 */
 function isTauri(): boolean {
@@ -69,4 +79,28 @@ async function loadSnapshot(): Promise<ScanResult> {
   }
   const data = (await res.json()) as ScanResult
   return { ...data, source: 'snapshot' }
+}
+
+// ───────────────────────────── Playbook 引擎（V0.2） ─────────────────────────────
+
+export async function listPlaybooks(): Promise<PlaybookSummary[]> {
+  if (!isTauri()) return []
+  return invoke<PlaybookSummary[]>('list_playbooks')
+}
+
+export async function runProbes(): Promise<ProbeRun[]> {
+  if (!isTauri()) return []
+  return invoke<ProbeRun[]>('run_probes')
+}
+
+export async function matchPlaybooks(ctx: MatchContext): Promise<MatchedPlaybook[]> {
+  if (!isTauri()) return []
+  return invoke<MatchedPlaybook[]>('match_playbooks', { ctx })
+}
+
+export async function diagnosePlaybook(id: string): Promise<DiagnoseResult> {
+  if (!isTauri()) {
+    throw new Error('诊断需要 Tauri 运行环境，请用 pnpm tauri:dev 启动')
+  }
+  return invoke<DiagnoseResult>('diagnose_playbook', { id })
 }

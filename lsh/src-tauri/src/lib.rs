@@ -1,5 +1,7 @@
 mod commands;
+mod exec;
 mod model;
+mod pb;
 mod registry;
 mod scanner;
 
@@ -12,6 +14,10 @@ pub fn run() {
             commands::list_services,
             commands::preview_action,
             commands::run_action,
+            commands::list_playbooks,
+            commands::match_playbooks,
+            commands::diagnose_playbook,
+            commands::run_probes,
         ])
         .run(tauri::generate_context!())
         .expect("启动 LocalServiceHub 失败");

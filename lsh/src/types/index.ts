@@ -102,3 +102,94 @@ export interface ScanResult {
   /** 仅浏览器 fallback 模式下存在：说明数据来自快照而非实时扫描 */
   source?: 'tauri' | 'snapshot'
 }
+
+// ───────────────────────────── Playbook 引擎（V0.2：只读诊断 + 结论 + 给命令） ─────────────────────────────
+
+export interface PlaybookSummary {
+  id: string
+  title: string
+  service: string | null
+  severity: string
+  category: string
+  symptom: string | null
+  has_fix: boolean
+  risk: string
+  requires_sudo: boolean
+}
+
+/** match_playbooks 的入参：注入触发器的探针变量（由 run_probes 产出） */
+export interface MatchContext {
+  probe_vars: Record<string, unknown>
+  home: string
+}
+
+export interface MatchedPlaybook {
+  id: string
+  title: string
+  service: string | null
+  severity: string
+  category: string
+  symptom: string | null
+  trigger_summary: string
+  notes: string[]
+}
+
+export interface DiagnoseStepOut {
+  id: string
+  title: string
+  cmd: string | null
+  output: string
+  exit: number
+  captured: unknown | null
+  error: string | null
+  /** 该步骤是否可选（失败不会阻断诊断） */
+  optional: boolean
+}
+
+export interface ConclusionOut {
+  when: string
+  root_cause: string
+  confidence: 'low' | 'medium' | 'high'
+  evidence: string[]
+  recommended_fix: string | null
+  matched: boolean
+}
+
+export interface FixStepPreview {
+  id: string
+  title: string
+  kind: string
+  command: string
+  snapshot: boolean
+}
+
+export interface FixPreview {
+  mode: string
+  confirm: boolean
+  risk: string
+  side_effects: string
+  requires_sudo: boolean
+  steps: FixStepPreview[]
+}
+
+export interface DiagnoseResult {
+  id: string
+  title: string
+  severity: string
+  category: string
+  symptom: string | null
+  source: string | null
+  steps: DiagnoseStepOut[]
+  vars: unknown
+  partial: boolean
+  conclusions: ConclusionOut[]
+  fix: FixPreview | null
+}
+
+export interface ProbeRun {
+  service: string
+  probe: string
+  ok: boolean
+  raw: string
+  vars: unknown
+}
