@@ -34,6 +34,33 @@ npm test              # vitest 离线单测（无需 key）
 npm run eval          # 真实 LLM 评测，写出 eval-report.md（需 key）
 ```
 
+### eval 的命令行参数
+
+```bash
+npm run eval                                  # 全量（本地 14B 约 7 分钟）
+npm run eval -- --case multi-1                # 只跑一个用例（约 3 分钟），改 prompt 时快速验证
+npm run eval -- --case calc-1 --case rag-1    # 指定多个
+npm run eval -- --out /tmp/try.md             # 报告写到别处，不覆盖 eval-report.md
+npm run eval -- --no-write                    # 只打印不落盘
+```
+
+全量跑一轮要 7 分钟左右（9 次 judge + 3 次 agent，本地 14B 模型）。
+调 prompt 时用 `--case` 只跑相关用例，能省一半时间。
+
+### ⚠️ 模型必须支持 tool_calls
+
+本工程的 Agent 靠工具调用完成任务，**模型不支持 `tool_calls` 时 eval 会全线崩塌**
+（表现为「工具调用 0 次」，模型把调用写成 JSON 文本正文，而 judge 认的是真实调用记录）。
+
+实测（Ollama OpenAI 兼容端点）：
+
+| 模型 | tool_choice=auto | tool_choice=required |
+|---|---|---|
+| `qwen3:14b` | ✅ 正常返回 `tool_calls` | ✅ 正常 |
+| `qwen2.5-coder:14b` | ❌ 只输出 JSON 文本 | ❌ 只输出 JSON 文本 |
+
+换模型后先跑一次 `npm run eval -- --case calc-1` 确认工具调用正常，再跑全量。
+
 ## 关键约定（避坑）
 
 1. AI SDK v7：`tool({ inputSchema, execute })`；`streamText` 用 `messages` 或 `prompt`；
@@ -41,6 +68,32 @@ npm run eval          # 真实 LLM 评测，写出 eval-report.md（需 key）
 2. `createOpenAI().chat(model)` 走 Chat Completions，兼容 DeepSeek / 通义等。
 3. `telemetry: { isEnabled: true }` 是 AI SDK 原生可观测开关；有 OpenTelemetry SDK 时导出到 collector，无 SDK 时自动 no-op。
 4. 评测器与 Agent 都做成「可注入」（`runEval(judge, agent, dataset)`），离线单测用 mock，真实跑用 LLM——**改 prompt 即跑回归**。
+5. **`streamText` 必须加 `stopWhen: stepCountIs(N)`**：AI SDK v5+ 默认只跑一步，模型一返回工具调用就结束，
+   需要多步的任务会静默退化。本工程吃过这个亏，详见 [docs/ITERATION.md](./docs/ITERATION.md)。
+6. **`.env` 的加载要放在 `model.ts` 而不是入口文件**：本工程 `npm start` 走 `index.ts`、
+   `npm run eval` 走 `src/cli.ts`，是两个入口。只在入口写 `import 'dotenv/config'` 很容易漏，
+   漏了之后 `AI_MODEL` 静默回落到硬编码默认值、连到错误端点，极难排查。
+   放在 `model.ts` 里，任何 import 链经过它的入口都会自动加载。
+
+## 迭代记录：eval 是怎么发现问题的
+
+`docs/` 下留了**四轮**真实评测报告，完整过程见 [docs/ITERATION.md](./docs/ITERATION.md)：
+
+| 轮次 | 改动 | 通过率 | 加权均分 | `synthesize` 兜底 |
+|---|---|---|---|---|
+| [v1 基线](./docs/eval-v1-baseline.md) | — （`.env` 未加载 + 模型不支持 `tool_calls`） | 0% | 0.47/10 | 未触发（压根没调工具） |
+| [v2](./docs/eval-v2-model-fix.md) | 换用支持 `tool_calls` 的 `qwen3:14b` | 100% | 9.6/10 | **每个用例都触发** |
+| [v3](./docs/eval-v3-stopwhen.md) | 补 `stopWhen: stepCountIs(5)` | 67% | 9.4/10 | 消失 ✅ |
+| [v4](./docs/eval-v4-judge-fix.md) | 修 judge 判定依据（以真实调用记录为准） | **100%** | **9.67/10** | 消失 ✅ |
+
+**v2 与 v3 分数几乎一样，但 trace 不一样** —— v2 每个用例都多出一个 `agent:synthesize`
+span（模型没跑完循环，靠兜底逻辑补答案），v3/v4 没有。分数看不出这层差异，可观测能。
+这正好说明为什么 eval 和 observability 必须成对出现：前者告诉你「好不好」，后者告诉你「为什么」。
+
+四次改动里**没有一次是调 prompt**，全是配置、框架用法、评测设计层面的问题 ——
+也都是「只读代码发现不了、一跑就现形」的那类。
+
+> `eval-report.md` 是每次覆盖的最新产物（已 gitignore）；每轮归档在 `docs/eval-vN-*.md`，可追溯。
 
 ## 进阶
 

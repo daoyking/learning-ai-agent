@@ -18,5 +18,15 @@
       { "name": "概念准确", "description": "正确说明 RAG 是检索增强生成", "weight": 2 },
       { "name": "降低幻觉", "description": "提到检索资料可降低幻觉" }
     ]
+  },
+  {
+    "id": "multi-1",
+    "input": "请先检索 RAG 的资料，再帮我算一下 3 * 7 等于多少，最后把两件事一起告诉我。",
+    "context": "需要连续调用两个不同工具（searchDocs 检索 + calculator 计算）才能完成，用于验证 Agent 是否具备多步循环能力。",
+    "criteria": [
+      { "name": "调用检索", "description": "必须调用 searchDocs 工具检索 rag 资料", "weight": 2 },
+      { "name": "调用计算", "description": "必须调用 calculator 工具完成 3*7 的计算", "weight": 2 },
+      { "name": "结果完整", "description": "回答须同时包含 RAG 的解释与 21 这个计算结果" }
+    ]
   }
 ]

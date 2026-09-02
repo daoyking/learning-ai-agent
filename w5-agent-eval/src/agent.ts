@@ -1,4 +1,4 @@
-import { streamText, generateText } from 'ai';
+import { streamText, generateText, stepCountIs } from 'ai';
 import { calculator, searchDocs } from './tools.js';
 import { model } from './model.js';
 import { tracer } from './trace.js';
@@ -27,6 +27,10 @@ export async function runAgent(prompt: string): Promise<AgentRun> {
       tools: { calculator, searchDocs },
       // 演示用：强制模型在需要时使用工具，避免只在文本里「口述」而不实际调用
       toolChoice: 'required',
+      // 多步循环：AI SDK v5+ 默认只跑一步，模型一返回工具调用就结束。
+      // 不加这句，依赖「先检索再计算」这类需要多步的任务会静默退化成一步。
+      // 5 是步数上限，用来兜住模型反复调用工具的死循环。
+      stopWhen: stepCountIs(5),
       // 可观测性：开启 AI SDK 原生 telemetry。
       // 有 OpenTelemetry SDK 时导出到 collector；无 SDK 时自动 no-op，不会报错。
       telemetry: {
