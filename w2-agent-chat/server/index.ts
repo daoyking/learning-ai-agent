@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { streamText, convertToModelMessages } from 'ai';
+import { streamText, convertToModelMessages, stepCountIs } from 'ai';
 import { createModel } from './model.js';
 import { tools } from './tools.js';
 import { buildMemoryContext, remember, isMemoryAvailable } from './memory.js';
@@ -40,6 +40,10 @@ app.post('/api/chat', async (req, res) => {
     system,
     messages: await convertToModelMessages(messages),
     tools,
+    // AI SDK v5+ 默认只跑 1 步：模型返回工具调用后就结束，不会再基于工具结果作答。
+    // 表现是「界面上看到工具被调用、返回了结果，但助手一句话都没说」。
+    // 声明 stopWhen 后，工具结果会回灌给模型继续生成，直到没有更多工具调用或达到步数上限。
+    stopWhen: stepCountIs(5),
     onFinish: async ({ text }) => {
       // 2) 对话结束后把本轮内容记入长期记忆（后续会话可召回）
       if (lastUserMsg && text) {

@@ -11,10 +11,34 @@
 
 ## 运行
 ```bash
-cp .env.example .env   # 填 key
+cp .env.example .env   # 默认已配本地 Ollama，也可换任意 OpenAI 协议兼容端点
 npm install
 npm start              # 用 Agent（带工具）读取简历+JD 并打分，输出 Markdown 报告
 ```
+
+### 模型后端（默认走本地 Ollama）
+
+```bash
+OPENAI_API_KEY=ollama
+OPENAI_BASE_URL=http://localhost:11434/v1
+AI_MODEL=qwen3:14b
+```
+
+换回云端只需改这三行（原 SiliconFlow 配置留档为 `.env.bak-siliconflow-*`）。
+注意本地 14B 模型跑完整流程约 **2–3 分钟**（云端通常 20–40 秒），演示时预留时间。
+
+### 样例数据：改造前 / 改造后
+
+`sample/` 下放了两份简历，用来演示「用打分器自检差距」的闭环：
+
+| 文件 | 说明 | 实测总分 |
+|------|------|---------|
+| `resume-v1-before.txt` | 改造前：AI 一栏只写「正在学习 Agent 开发」 | **38/50**（AI 维度仅 5/10） |
+| `resume.txt`（当前） | 改造后：补上 4 个可运行 Agent 工程与具体技术点 | **45/50**（AI 维度 10/10） |
+
+打分器读的是 `sample/resume.txt`。想复现「改造前」的分数，把它换成
+`resume-v1-before.txt` 的内容即可——这个前后对比本身就是一段很好的演示叙事：
+**用 Agent 找出自己简历的短板 → 按建议补 → 分数从 38 涨到 45**。
 
 ### 进阶：用 Mastra Workflow 显式编排
 `workflows/scoreWorkflow.ts` 把流程拆成两个有向步骤：`loadData → score`，

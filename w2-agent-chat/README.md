@@ -10,11 +10,27 @@
 
 ## 运行
 ```bash
-cp .env.example .env   # 填入 API key（DeepSeek / OpenAI 等）
+cp .env.example .env   # 默认已配本地 Ollama，也可换任意 OpenAI 协议兼容端点
 npm install
 npm run dev            # 同时起后端(3001) 与前端(5173)
 ```
 打开 http://localhost:5173
+
+### 模型后端（默认走本地 Ollama）
+
+`.env` 默认指向本地 Ollama，零成本、离线可用，演示不怕断网 / 不怕账户余额不足：
+
+```bash
+OPENAI_API_KEY=ollama
+OPENAI_BASE_URL=http://localhost:11434/v1
+AI_MODEL=qwen3:14b
+```
+
+换回云端只需改这三行（原 SiliconFlow 配置留档为 `.env.bak-siliconflow-*`）。
+
+> 实测：`qwen3:14b` 在本地完整支持工具调用（2026-09-02 验证，13 秒内跑通
+> 「问时间 → 调 getCurrentTime → 回答」全链路）。注意 `max_tokens` 别设太小，
+> 思考型模型的推理过程会先把额度吃光，导致拿不到工具调用。
 
 ## 内置工具
 | 工具 | 说明 | 是否需外部 key |
@@ -30,9 +46,12 @@ npm run dev            # 同时起后端(3001) 与前端(5173)
 ## 这个工程教什么
 1. **Agent 循环的最小骨架**：LLM 返回的是「工具调用」还是「文本」由 SDK 自动处理。
 2. **工具定义**：`tool({ description, inputSchema(zod), execute })` —— 描述决定模型何时调。
-3. **真实工具的工程细节**：文件读写的沙箱化与路径穿越防护、HTTP 抓取的容错与截断。
-4. **流式 UI**：`useChat` 自动消费 SSE，逐字渲染；`message.parts` 里 `tool-*` 片段即工具事件。
-5. **前端差异化**：工具调用的「输入/输出/状态」可视化，正是前端工程师做 Agent 的护城河。
+3. **多步循环必须显式声明**：AI SDK v5+ 的 `streamText` 默认**只跑一步**。
+   不传 `stopWhen: stepCountIs(N)` 的话，模型一返回工具调用就结束了，
+   界面上会看到「调用了工具，但没有回答」。`N` 就是允许的最大步数，防死循环。
+4. **真实工具的工程细节**：文件读写的沙箱化与路径穿越防护、HTTP 抓取的容错与截断。
+5. **流式 UI**：`useChat` 自动消费 SSE，逐字渲染；`message.parts` 里 `tool-*` 片段即工具事件。
+6. **前端差异化**：工具调用的「输入/输出/状态」可视化，正是前端工程师做 Agent 的护城河。
 
 ## 下一步
 - 增删 `server/tools.ts` 里的工具（如接真实天气 API、查数据库）。

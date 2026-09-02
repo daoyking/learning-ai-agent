@@ -38,6 +38,70 @@ mask_key() {
   if [ "$len" -eq 0 ]; then echo "(空)"; else echo "${v:0:6}…(${len}位)"; fi
 }
 
+# 真实连通性探测：光看「.env 里有 key」是不够的
+#   2026-09-02 踩坑：SiliconFlow key 在、格式对、网络通，但账户余额不足
+#   （返回 30001 insufficient balance），四个工程全部调用失败。
+#   所以这里必须真的发一次请求，而不是只检查配置存在。
+probe_provider() {
+  local dir="$1"
+  [ -f "$dir/.env" ] || return 0
+
+  local base model
+  base=$(grep -hoE '^OPENAI_BASE_URL=.+$'  "$dir/.env" | head -1 | sed -E 's/^[^=]+=//' | tr -d "\"'" | tr -d '[:space:]')
+  model=$(grep -hoE '^AI_MODEL=.+$'       "$dir/.env" | head -1 | sed -E 's/^[^=]+=//' | tr -d "\"'" | tr -d '[:space:]')
+  [ -n "$base" ] || return 0
+
+  # ── 本地 Ollama 分支 ──
+  if printf '%s' "$base" | grep -qE '11434|localhost|127\.0\.0\.1'; then
+    if ! curl -s -m 5 --noproxy '*' http://localhost:11434/api/tags >/dev/null 2>&1; then
+      bad "Ollama 未运行（$base）→ 执行 ollama serve"
+      return 0
+    fi
+    if [ -n "$model" ]; then
+      local have
+      have=$(curl -s -m 8 --noproxy '*' http://localhost:11434/api/tags 2>/dev/null \
+             | grep -o "\"name\":\"${model}" | head -1)
+      if [ -z "$have" ]; then
+        bad "模型 $model 未安装 → ollama pull $model"
+      else
+        ok "Ollama 在线，模型 $model 已安装"
+      fi
+    else
+      ok "Ollama 在线"
+    fi
+    return 0
+  fi
+
+  # ── 云端分支：真发一次最小请求，识别「配置在但调不通」──
+  local key
+  key=$(grep -hoE '^[A-Z0-9_]*(API_KEY|AUTH_TOKEN)=.+$' "$dir/.env" | head -1 | sed -E 's/^[^=]+=//' | tr -d "\"'" | tr -d '[:space:]')
+  [ -n "$key" ] || return 0
+
+  local resp
+  resp=$(curl -s -m 25 "$base/chat/completions" \
+           -H "Authorization: Bearer $key" -H 'Content-Type: application/json' \
+           -d "{\"model\":\"${model:-gpt-4o-mini}\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}" 2>&1)
+
+  if [ -z "$resp" ]; then
+    warn "云端端点无响应（$base）——可能是网络/代理问题，录屏前务必手动验一次"
+    return 0
+  fi
+  case "$resp" in
+    *insufficient*|*balance*|*"余额"*|*quota*|*Quota*)
+      bad "云端账户余额/额度不足 → 充值，或切本地 Ollama（见 .env.bak-* 旁的注释）" ;;
+    *"Incorrect API key"*|*invalid_api_key*|*401*|*Unauthorized*)
+      bad "API key 无效（$base）" ;;
+    *"does not exist"*|*model_not_found*|*"Model does not exist"*)
+      bad "模型 ${model} 在该平台不存在 → 换平台支持的模型名" ;;
+    *"choices"*|*completion_tokens*)
+      ok "云端端点实测可用（$base · $model）" ;;
+    *)
+      warn "云端响应无法判定：$(
+        printf '%s' "$resp" | tr -d '\n' | cut -c1-90
+      )…" ;;
+  esac
+}
+
 check_project() {
   local d="$1" name="$2" port="$3" start="$4"
   local dir="$PORTFOLIO_DIR/$d"
@@ -55,6 +119,8 @@ check_project() {
     else
       bad ".env 存在但没有有效 key（录屏时 W2/W3/W4 会调用失败）"
     fi
+    # 真实连通性探测（key 在 ≠ 调得通）
+    probe_provider "$dir"
   else
     bad ".env 缺失 → cp $d/.env.example $d/.env 后填 key"
   fi

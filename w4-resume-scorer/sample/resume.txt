@@ -1,17 +1,24 @@
-金道洋 / 前端开发工程师
+金道洋 / 前端开发工程师 · 全栈 / AI 应用方向
 
 【技能】
-- 框架：React / Vue / Svelte / SolidJS，熟悉组件化与状态管理
-- 语言：TypeScript / JavaScript，类型系统扎实
-- 工程化：Vite / Webpack，CI/CD，Monorepo
-- 后端：Node.js / Express，能独立完成全栈交付
-- AI：日常使用 WorkBuddy / Claude Code 等 Agent 工具，正在学习 Agent 开发
+- 框架：Vue2 / Vue3 全家桶 / React / Svelte / SolidJS，熟悉组件化与状态管理
+- 语言：TypeScript / JavaScript（ES6+），类型系统扎实
+- 工程化：Vite / Webpack、CI/CD、Husky + commitlint、Jenkins
+- 后端：Node.js / Express / SQLite，能独立完成全栈交付与阿里云 ECS 上线
+- AI：LLM API 集成、Prompt 工程、流式输出、工具调用（Function Calling）、
+  RAG 知识库问答、AI Agent 开发（Vercel AI SDK / Mastra / LangGraph）
 
 【项目】
-- 湖北鸿萌官网克隆：Vue3 + Element Plus + Vite 前端，Express5 + node:sqlite 后端，78 款产品数据完整呈现
-- 自生长 Obsidian 知识库：基于 Karpathy LLM Wiki 三层架构，4 项自动化工作流
-- AI HOT 每日资讯仪表盘：单文件 HTML，5 大板块 + 响应式卡片网格
+- 鸿萌企业官网全栈（hmnmt.com）：Vue3 + Element Plus + Vite 前端，Express5 + Node.js + SQLite 后端，
+  78 款产品数据完整呈现；落地中英双语 i18n、暗黑主题、后台管理；已部署阿里云 ECS 并开源
+- AI Agent 应用开发（个人自研，4 个可运行工程）：
+  · 流式对话 Agent：Vercel AI SDK 流式传输 + 工具调用可视化，前端逐字渲染
+  · RAG 知识库问答：文档切片 → Embedding → 余弦相似度检索 → 引用溯源，抑制幻觉
+  · 简历评分 Agent：Mastra 多步编排，读简历 → 抓 JD → 维度打分 → 结构化输出
+  · 评测与可观测：自动化 eval 数据集 + 打分报告，量化 Agent 质量
+- 自生长 Obsidian 知识库：Karpathy LLM Wiki 三层架构（raw → wiki → schema），6 项自动化工作流
+- AI HOT 每日资讯仪表盘：单文件 HTML，5 大板块 + 响应式卡片网格，每日自动更新
 
 【特点】
-- 重视可运行交付物与作品集
+- 重视可运行交付物与作品集，4 个 Agent 工程均带测试与线上演示
 - 擅长把复杂流程做成清晰的交互界面
