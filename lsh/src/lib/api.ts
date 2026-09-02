@@ -9,6 +9,9 @@ import type {
   PortEntry,
   RunActionResult,
   ScanResult,
+  LogSourceView,
+  LogTail,
+  DoctorCheck,
 } from '../types'
 
 /** 自己判定，避免依赖特定版本的导出符号 */
@@ -103,4 +106,42 @@ export async function diagnosePlaybook(id: string): Promise<DiagnoseResult> {
     throw new Error('诊断需要 Tauri 运行环境，请用 pnpm tauri:dev 启动')
   }
   return invoke<DiagnoseResult>('diagnose_playbook', { id })
+}
+
+// ───────────────────────────── 日志中心（V0.2） ─────────────────────────────
+
+export async function listLogSources(serviceId: string): Promise<LogSourceView[]> {
+  if (!isTauri()) return []
+  return invoke<LogSourceView[]>('list_log_sources', { serviceId })
+}
+
+export async function tailLogs(
+  serviceId: string,
+  lines = 200
+): Promise<LogTail[]> {
+  if (!isTauri()) return []
+  return invoke<LogTail[]>('tail_logs', { serviceId, lines })
+}
+
+export async function rotateLog(
+  serviceId: string,
+  sourceId: string
+): Promise<string> {
+  if (!isTauri()) {
+    throw new Error('旋转需要 Tauri 运行环境，请用 pnpm tauri:dev 启动')
+  }
+  return invoke<string>('rotate_log', { serviceId, sourceId })
+}
+
+// ───────────────────────────── 环境体检 Doctor ─────────────────────────────
+
+export async function runDoctor(): Promise<DoctorCheck[]> {
+  if (!isTauri()) return []
+  return invoke<DoctorCheck[]>('run_doctor')
+}
+
+/** 把当前整体健康结论同步到托盘 tooltip（常驻后台时一眼可见） */
+export async function updateTrayStatus(status: string): Promise<void> {
+  if (!isTauri()) return
+  await invoke('update_tray_status', { status })
 }

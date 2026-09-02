@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { scanServices, previewAction, runAction } from './lib/api'
 import { ServiceCard } from './components/ServiceCard'
 import { PlaybookPanel } from './components/PlaybookPanel'
+import { LogPanel } from './components/LogPanel'
+import { DoctorPanel } from './components/DoctorPanel'
 import type {
   ActionPreview,
   RunActionResult,
@@ -50,7 +52,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [manage, setManage] = useState<ManageState | null>(null)
-  const [view, setView] = useState<'services' | 'playbooks'>('services')
+  const [view, setView] = useState<'services' | 'playbooks' | 'logs' | 'doctor'>('services')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -165,6 +167,10 @@ export default function App() {
 
       {view === 'playbooks' ? (
         <PlaybookPanel />
+      ) : view === 'logs' ? (
+        <LogPanel />
+      ) : view === 'doctor' ? (
+        <DoctorPanel />
       ) : (
         <>
           <header className="flex items-center justify-between border-b border-ink-700 px-5 py-3">
@@ -277,12 +283,14 @@ function TabBar({
   view,
   onChange,
 }: {
-  view: 'services' | 'playbooks'
-  onChange: (v: 'services' | 'playbooks') => void
+  view: 'services' | 'playbooks' | 'logs' | 'doctor'
+  onChange: (v: 'services' | 'playbooks' | 'logs' | 'doctor') => void
 }) {
-  const tabs: { id: 'services' | 'playbooks'; label: string }[] = [
+  const tabs: { id: 'services' | 'playbooks' | 'logs' | 'doctor'; label: string }[] = [
     { id: 'services', label: '服务' },
     { id: 'playbooks', label: '诊断台' },
+    { id: 'logs', label: '日志' },
+    { id: 'doctor', label: '体检' },
   ]
   return (
     <div className="flex items-center gap-1 border-b border-ink-700 bg-ink-900 px-3 py-1.5">

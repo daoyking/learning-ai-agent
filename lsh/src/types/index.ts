@@ -193,3 +193,46 @@ export interface ProbeRun {
   raw: string
   vars: unknown
 }
+
+// ───────────────────────────── 日志中心（V0.2：聚合尾部 + 大小体检 + 旋转） ─────────────────────────────
+
+export interface RotateView {
+  max_size: string
+  max_bytes: number
+  keep: number
+  strategy: string
+}
+
+export interface LogSourceView {
+  service_id: string
+  source_id: string
+  kind: string
+  path: string | null
+  container: string | null
+  command: string | null
+  label: string | null
+  rotate: RotateView | null
+  ignore_patterns: string[]
+}
+
+export interface LogTail {
+  source_id: string
+  kind: string
+  target: string
+  lines: string
+  truncated_from: number | null
+  over_threshold: boolean
+  rotate: RotateView | null
+  error: string | null
+}
+
+// ───────────────────────────── 环境体检 Doctor ─────────────────────────────
+
+export type CheckStatus = 'ok' | 'warn' | 'fail'
+
+export interface DoctorCheck {
+  id: string
+  title: string
+  status: CheckStatus
+  detail: string
+}

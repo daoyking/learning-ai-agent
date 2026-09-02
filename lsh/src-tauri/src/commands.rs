@@ -513,6 +513,41 @@ pub fn run_probes() -> Result<Vec<crate::pb::ProbeRun>, String> {
     crate::pb::run_all_probes()
 }
 
+// ───────────────────────────── 日志中心（V0.2：聚合尾部 + 旋转） ─────────────────────────────
+
+#[tauri::command]
+pub fn list_log_sources(service_id: String) -> Result<Vec<crate::logs::LogSourceView>, String> {
+    crate::logs::list_log_sources(&service_id)
+}
+
+#[tauri::command]
+pub fn tail_logs(service_id: String, lines: u32) -> Result<Vec<crate::logs::LogTail>, String> {
+    crate::logs::tail_logs(&service_id, lines)
+}
+
+#[tauri::command]
+pub fn rotate_log(service_id: String, source_id: String) -> Result<String, String> {
+    crate::logs::rotate_log(&service_id, source_id)
+}
+
+// ───────────────────────────── 环境体检 Doctor ─────────────────────────────
+
+#[tauri::command]
+pub fn run_doctor() -> Result<Vec<crate::doctor::DoctorCheck>, String> {
+    crate::doctor::run_doctor()
+}
+
+/// 让前端把当前健康结论同步到托盘 tooltip。客户端常驻后台时，
+/// 一眼就能从菜单栏图标看到整体状态（无需点开窗口）。
+#[tauri::command]
+pub fn update_tray_status(app: tauri::AppHandle, status: String) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("lsh-tray") {
+        tray.set_tooltip(Some(status))
+            .map_err(|e| format!("更新托盘状态失败: {e}"))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
