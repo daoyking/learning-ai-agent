@@ -6,12 +6,27 @@
 > 本目录是一个**自包含的作品集站点**（`index.html`，无构建、无外部依赖，双击即可在浏览器打开），
 > 它引用同级目录里的四个真实工程作为「作品」。本 README 说明怎么跑通每个工程、怎么跑评测、怎么接可观测，以及怎么录屏讲解。
 
+## 线上地址（可直接投递 / 分享）
+
+| 页面 | 地址 |
+|------|------|
+| 作品集 | https://daoyking.github.io/learning-ai-agent/ |
+| 简历页 | https://daoyking.github.io/learning-ai-agent/resume.html |
+| 仓库 | https://github.com/daoyking/learning-ai-agent |
+
+站点由 GitHub Pages 托管，源分支 `gh-pages`（站点的 `index.html` / `resume.html` 需与 `main` 上的
+`w6-portfolio/` 保持同步，Pages 不会自动跟随 `main` 更新——改完记得两边都推）。
+
+**简历页用法**：浏览器打开后 `⌘P` / `Ctrl+P` 打印 → 存为 PDF，即 A4 两页定稿版。
+页面顶部「返回作品集 / 下载 HTML / 打印提示」三栏在打印时自动隐藏，不会出现在 PDF 里。
+
 ## 目录结构
 
 ```
 learning-AI/
 ├── w6-portfolio/        ← 本目录（作品集站点 + 说明）
 │   ├── index.html       自包含作品集页面（导航 / 路线 / 作品 / 工程实践 / 录屏）
+│   ├── resume.html      简历页（A4 两页定稿，含 AI 能力章节；屏幕显示带纸张容器）
 │   └── README.md        你正在看的文件
 ├── w2-agent-chat/       流式聊天 + 工具调用（Express + React + AI SDK）
 ├── w3-rag-qa/           RAG 流式问答（Embedding + 内存向量库）
@@ -98,7 +113,7 @@ npm run eval       # 真实 LLM 评测，写出 eval-report.md（需 key）
 ## 下一步（可选增强）
 
 - 把四个工程收进一个 **monorepo**（pnpm workspace），统一依赖与 lint。
-- 部署本作品集到静态托管（GitHub Pages / CloudStudio），生成可分享链接。
+- ~~部署本作品集到静态托管，生成可分享链接~~ ✅ 已落地：GitHub Pages，见上文「线上地址」。
 
 ## 已落地：评测数据集 + 可观测（W6 收尾补完）
 
