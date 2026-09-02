@@ -137,7 +137,7 @@
   .sec-head p { color: var(--text-soft); margin-top: 10px; max-width: 660px; font-size: 15.5px; }
 
   /* TIMELINE */
-  .timeline { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .timeline { display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; }
   @media (max-width: 860px) { .timeline { grid-template-columns: repeat(2, 1fr); } }
   .tl-card {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
@@ -295,7 +295,7 @@
       <a class="btn btn-ghost" href="https://daoyking.github.io/learning-ai-agent/resume.html" target="_blank" rel="noopener">看简历 ↗</a>
     </div>
     <div class="hero-stats">
-      <div class="stat"><div class="n">4<span class="u"> 个</span></div><div class="l">可运行 Agent 工程</div></div>
+      <div class="stat"><div class="n">5<span class="u"> 个</span></div><div class="l">可运行 Agent 工程</div></div>
       <div class="stat"><div class="n">6<span class="u"> 周</span></div><div class="l">系统学习路线</div></div>
       <div class="stat"><div class="n">2<span class="u"> 套</span></div><div class="l">质量护栏（Eval / Trace）</div></div>
       <div class="stat"><div class="n">100<span class="u">%</span></div><div class="l">前端可视化差异化</div></div>
@@ -333,7 +333,8 @@
       <div class="tl-card done reveal"><div class="tl-week">W3</div><h3>RAG 检索增强</h3><p>向量库 + Embedding + 带引用生成</p></div>
       <div class="tl-card done reveal"><div class="tl-week">W4</div><h3>多步编排</h3><p>Mastra Agent / Workflow 编排</p></div>
       <div class="tl-card done reveal"><div class="tl-week">W5</div><h3>评测与可观测</h3><p>LLM-as-judge + 自建 Tracer / telemetry</p></div>
-      <div class="tl-card current reveal"><div class="tl-week">W6</div><h3>作品集交付</h3><p>整合打磨 + 录屏 + 面试讲解</p></div>
+      <div class="tl-card done reveal"><div class="tl-week">W6</div><h3>作品集交付</h3><p>整合打磨 + 录屏 + 面试讲解</p></div>
+      <div class="tl-card current reveal"><div class="tl-week">W7</div><h3>系统客户端</h3><p>总管本机 9 个自托管 AI 服务</p></div>
     </div>
   </div>
 </section>
@@ -342,7 +343,7 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <div class="sec-tag">Projects</div>
-      <h2>四个可运行的 Agent 工程</h2>
+      <h2>五个可运行的 Agent 工程</h2>
       <p>每个工程都配套完整 README、可一键运行，并在本页下方给出演示与录屏脚本。</p>
     </div>
     <div class="grid">
@@ -388,6 +389,17 @@
         <div class="card-foot">
           <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w5-agent-eval">README →</a>
           <span class="run">npm test / npm run eval</span>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-top"><span class="badge green">W7 · 系统客户端</span><span>Tauri 2 + Rust</span></div>
+        <h3>Local Service Hub：本地 AI 服务总管</h3>
+        <p class="pitch">把本机 9 个自托管 AI 服务（Ollama / OmniRoute / Odysseus / SearXNG…）统一纳管。差异化 = 三级健康探针（L1 端口 / L2 HTTP / L3 语义）抓「假活」，加「监管状态」维度抓「跑着但无人接管」。前端工程师做系统工具的护城河：真实扫描本机、把风险可视化。</p>
+        <div class="tags"><span class="tag">Tauri 2</span><span class="tag">Rust</span><span class="tag">端口扫描</span><span class="tag">假活检测</span><span class="tag">监管态</span></div>
+        <div class="card-foot">
+          <a href="https://github.com/daoyking/learning-ai-agent/tree/main/lsh">README →</a>
+          <span class="run">cargo tauri dev</span>
         </div>
       </div>
 
@@ -616,6 +628,7 @@
         <div class="step"><div class="num"></div><div class="body"><h4>W3 RAG（50s）</h4><p>跑 <code>cd w3-rag-qa &amp;&amp; npm run dev</code>，提问知识库内容，展示检索来源（文件名 + 相似度 + 片段）与引用。</p></div></div>
         <div class="step"><div class="num"></div><div class="body"><h4>W4 编排（50s）</h4><p>跑 <code>cd w4-resume-scorer &amp;&amp; npm start</code>，展示「读简历→抓 JD→多维度打分→建议」的多步编排与结构化报告。</p></div></div>
         <div class="step"><div class="num"></div><div class="body"><h4>W5 护栏（60s）</h4><p>跑 <code>cd w5-agent-eval &amp;&amp; npm test</code>（离线单测）+ <code>npm run eval</code>（真实评测出 eval-report.md），讲 Span 时间线与 OTel 对接。</p></div></div>
+        <div class="step"><div class="num"></div><div class="body"><h4>W7 系统客户端（40s）</h4><p>跑 <code>cd lsh &amp;&amp; cargo tauri dev</code>，展示本机 9 个服务卡片；点开一个服务，看到「端口在跑但无人监管」的琥珀告警——这是前端工程师做系统工具的差异点。顺带讲 L3 探针怎么抓 OmniRoute 的「假活」。</p></div></div>
         <div class="step"><div class="num"></div><div class="body"><h4>收尾：工程化视角（30s）</h4><p>前端的可视化能力 + Agent 的质量护栏，是我做 AI 产品的差异化优势。</p></div></div>
       </div>
       <div class="checklist">
@@ -641,6 +654,7 @@
       <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w3-rag-qa">W3</a>
       <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w4-resume-scorer">W4</a>
       <a href="https://github.com/daoyking/learning-ai-agent/tree/main/w5-agent-eval">W5</a>
+      <a href="https://github.com/daoyking/learning-ai-agent/tree/main/lsh">W7</a>
       <a href="https://daoyking.github.io/learning-ai-agent/resume.html">简历</a>
     </div>
   </div>
