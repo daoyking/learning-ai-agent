@@ -191,6 +191,7 @@ function buildCard(m, ports) {
     priority: m.priority ?? 'P1',
     tags: m.tags ?? [],
     supervisor_kind: m.supervisor.kind,
+    actions: Object.keys(m.supervisor.actions ?? {}),
     depends_on: m.depends_on ?? [],
     provides: m.provides ?? [],
     port: declared,

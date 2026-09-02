@@ -42,6 +42,8 @@ export interface ServiceCard {
   priority: string
   tags: string[]
   supervisor_kind: SupervisorKind
+  /** manifest 里声明的可执行动作：start/stop/restart/status/bootstrap… */
+  actions: string[]
   depends_on: string[]
   provides: string[]
   port: number | null
@@ -55,6 +57,40 @@ export interface ServiceCard {
   playbooks: string[]
   l3_count: number
   log_count: number
+}
+
+/** preview_action 返回：将要执行的命令 + 安全等级 */
+export interface ActionPreview {
+  service_id: string
+  action: string
+  effective_action: string
+  danger: 'none' | 'confirm' | 'sudo'
+  requires_confirm: boolean
+  sudo_required: boolean
+  command: string
+  cwd: string
+  rerouted: string | null
+  note: string | null
+}
+
+/** run_action 返回：执行结果 / 后台 pid / 捕获的输出 */
+export interface RunActionResult {
+  service_id: string
+  action: string
+  effective_action: string
+  executed: boolean
+  danger: 'none' | 'confirm' | 'sudo'
+  requires_confirm: boolean
+  sudo_required: boolean
+  command: string
+  cwd: string
+  rerouted: string | null
+  output: string | null
+  exit_code: number | null
+  spawned_pid: number | null
+  timed_out: boolean
+  note: string | null
+  error: string | null
 }
 
 export interface ScanResult {

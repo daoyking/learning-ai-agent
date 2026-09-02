@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { scanServices, previewAction } from './lib/api'
+import { scanServices, previewAction, runAction } from './lib/api'
 import { ServiceCard } from './components/ServiceCard'
-import type { ScanResult, ServiceCard as Card } from './types'
+import type {
+  ActionPreview,
+  RunActionResult,
+  ScanResult,
+  ServiceCard as Card,
+} from './types'
 
 const CATEGORY_ORDER = ['proxy', 'inference', 'gateway', 'rag', 'workspace', 'infra', 'devtool']
 
@@ -15,11 +20,35 @@ const CATEGORY_LABEL: Record<string, string> = {
   devtool: '开发工具',
 }
 
+/** 动作展示顺序与中文名 */
+const ACTION_ORDER = ['start', 'stop', 'restart', 'status', 'bootstrap']
+const ACTION_LABEL: Record<string, string> = {
+  start: '启动',
+  stop: '停止',
+  restart: '重启',
+  status: '状态',
+  bootstrap: '注册',
+}
+
+const DANGER_BADGE: Record<string, { label: string; cls: string }> = {
+  none: { label: '无风险', cls: 'bg-emerald-500/15 text-emerald-300' },
+  confirm: { label: '需确认', cls: 'bg-amber-500/15 text-amber-300' },
+  sudo: { label: '需提权', cls: 'bg-rose-500/15 text-rose-300' },
+}
+
+interface ManageState {
+  card: Card
+  preview: ActionPreview | null
+  result: RunActionResult | null
+  loading: boolean
+  error: string | null
+}
+
 export default function App() {
   const [data, setData] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [manage, setManage] = useState<ManageState | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,9 +105,57 @@ export default function App() {
     }
   }, [data])
 
-  const onPreviewStart = useCallback(async (id: string) => {
-    setPreview(await previewAction(id, 'start'))
+  const openManage = useCallback((card: Card) => {
+    setManage({ card, preview: null, result: null, loading: false, error: null })
   }, [])
+
+  const closeManage = useCallback(() => setManage(null), [])
+
+  /** 点某个动作 → 先取预览（含安全等级），不执行 */
+  const previewAnAction = useCallback(
+    async (card: Card, action: string) => {
+      setManage((m) =>
+        m ? { ...m, preview: null, result: null, loading: true, error: null } : m
+      )
+      try {
+        const preview = await previewAction(card.id, action)
+        setManage((m) => (m ? { ...m, preview, loading: false } : m))
+      } catch (e) {
+        setManage((m) => (m ? { ...m, loading: false, error: String(e) } : m))
+      }
+    },
+    []
+  )
+
+  /** 确认执行（confirmed=true） */
+  const executeAction = useCallback(
+    async (card: Card, action: string) => {
+      setManage((m) =>
+        m ? { ...m, result: null, loading: true, error: null } : m
+      )
+      try {
+        const result = await runAction(card.id, action, true)
+        setManage((m) => (m ? { ...m, result, loading: false } : m))
+      } catch (e) {
+        setManage((m) => (m ? { ...m, loading: false, error: String(e) } : m))
+      }
+    },
+    []
+  )
+
+  const afterRunRescan = useCallback(async () => {
+    await load()
+    setManage(null)
+  }, [load])
+
+  // 按固定顺序展示该服务支持的动作
+  const sortedActions = useMemo(() => {
+    if (!manage) return []
+    return [...manage.card.actions].sort(
+      (a, b) =>
+        ACTION_ORDER.indexOf(a) - ACTION_ORDER.indexOf(b)
+    )
+  }, [manage])
 
   return (
     <div className="flex h-full flex-col">
@@ -123,12 +200,11 @@ export default function App() {
         </div>
       )}
 
-      {/* V0.1 的诚实声明：L1 绿灯不等于真能用 */}
+      {/* V0.2 能力声明：L1 + 真实启停已落地 */}
       <div className="mx-5 mt-3 rounded border border-status-degraded/30 bg-status-degraded/[0.07] px-3 py-2 text-[11px] leading-relaxed text-slate-400">
-        <b className="text-status-degraded">V0.1 仅 L1 判定。</b>
-        绿色只代表端口在监听，<b>不代表服务真的能用</b>。
-        L2（HTTP 就绪）与 L3（语义探针）在 V0.2 接入 —— 本机已知 3 类假活场景
-        （OmniRoute 供应商假可用、Odysseus 模型数假 0、SearXNG 搜索结果本地化）都只能靠 L3 发现。
+        <b className="text-status-degraded">V0.2：L1 判定 + 真实启停。</b>
+        点卡片「管理」可预览并真实执行启停动作（按 manifest 的 danger 等级做二次确认 / 提权隔离）。
+        绿色只代表端口在监听，<b>不代表服务真的能用</b> —— L2/L3 语义探针在 V0.3 接入。
       </div>
 
       <main className="flex-1 overflow-y-auto px-5 py-4">
@@ -140,7 +216,7 @@ export default function App() {
             </h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
               {cards.map((card) => (
-                <ServiceCard key={card.id} card={card} onPreviewStart={onPreviewStart} />
+                <ServiceCard key={card.id} card={card} onManage={openManage} />
               ))}
             </div>
           </section>
@@ -173,30 +249,170 @@ export default function App() {
         </section>
       </main>
 
-      {preview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-8"
-          onClick={() => setPreview(null)}
-        >
-          <div
-            className="max-w-2xl rounded-lg border border-ink-600 bg-ink-800 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-2 text-[11px] text-slate-400">
-              V0.1 不执行启停，只回显命令（dry-run）
+      {manage && (
+        <ManageModal
+          state={manage}
+          actions={sortedActions}
+          onClose={closeManage}
+          onPreview={previewAnAction}
+          onExecute={executeAction}
+          onRescan={afterRunRescan}
+        />
+      )}
+    </div>
+  )
+}
+
+function ManageModal({
+  state,
+  actions,
+  onClose,
+  onPreview,
+  onExecute,
+  onRescan,
+}: {
+  state: ManageState
+  actions: string[]
+  onClose: () => void
+  onPreview: (card: Card, action: string) => void
+  onExecute: (card: Card, action: string) => void
+  onRescan: () => void
+}) {
+  const { card, preview, result, loading, error } = state
+  const badge = preview ? DANGER_BADGE[preview.danger] : null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-8"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-ink-600 bg-ink-800 p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div>
+            <div className="text-sm font-semibold text-slate-100">{card.name}</div>
+            <div className="mt-0.5 font-mono text-[10px] text-slate-500">
+              {card.id} · :{card.port ?? '—'} · {card.supervisor_kind}
             </div>
-            <pre className="whitespace-pre-wrap rounded bg-ink-900 p-3 font-mono text-[11px] text-slate-300">
-              {preview}
-            </pre>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded border border-ink-600 px-2 py-0.5 text-[11px] text-slate-400 hover:border-slate-500"
+          >
+            关闭
+          </button>
+        </div>
+
+        {/* 动作列表 */}
+        <div className="mb-3 flex flex-wrap gap-2">
+          {actions.map((a) => (
             <button
-              onClick={() => setPreview(null)}
-              className="mt-3 rounded border border-ink-600 px-3 py-1 text-[11px] text-slate-300 hover:border-slate-500"
+              key={a}
+              onClick={() => onPreview(card, a)}
+              disabled={loading}
+              className="rounded border border-ink-600 px-3 py-1 text-[11px] text-slate-200 transition-colors hover:border-slate-400 hover:bg-ink-700 disabled:opacity-40"
             >
-              关闭
+              {ACTION_LABEL[a] ?? a}
+            </button>
+          ))}
+        </div>
+
+        {loading && <div className="text-[11px] text-slate-500">执行中…</div>}
+
+        {error && (
+          <div className="mb-2 rounded border border-status-down/40 bg-status-down/10 px-2 py-1.5 text-[11px] text-status-down">
+            {error}
+          </div>
+        )}
+
+        {/* 预览 / 结果区 */}
+        {preview && !result && (
+          <div className="rounded border border-ink-700 bg-ink-900 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[11px] text-slate-300">
+                将执行：{ACTION_LABEL[preview.effective_action] ?? preview.effective_action}
+              </span>
+              {badge && (
+                <span className={`rounded px-1.5 py-0.5 text-[10px] ${badge.cls}`}>
+                  {badge.label}
+                </span>
+              )}
+            </div>
+
+            {preview.rerouted && (
+              <div className="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-300">
+                前置条件不满足：{preview.rerouted}
+                （已改用 {preview.effective_action} 代替原动作）
+              </div>
+            )}
+
+            <pre className="mb-1 whitespace-pre-wrap rounded bg-ink-950 p-2 font-mono text-[11px] text-slate-300">
+              {preview.command}
+            </pre>
+            <div className="font-mono text-[10px] text-slate-600">cwd: {preview.cwd}</div>
+
+            {preview.sudo_required ? (
+              <div className="mt-3 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-2 text-[11px] text-rose-300">
+                该动作需要 sudo / 提权，客户端不代执行。请在终端手动运行上面的命令。
+              </div>
+            ) : (
+              <button
+                onClick={() => onExecute(card, preview.action)}
+                className={`mt-3 rounded px-3 py-1 text-[11px] text-white transition-colors ${
+                  preview.requires_confirm
+                    ? 'bg-amber-600 hover:bg-amber-500'
+                    : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
+              >
+                {preview.requires_confirm ? '确认执行' : '执行'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {result && (
+          <div className="rounded border border-ink-700 bg-ink-900 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-[11px] text-slate-300">
+                {ACTION_LABEL[result.effective_action] ?? result.effective_action} 结果
+              </span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] ${
+                  result.executed && !result.error
+                    ? 'bg-emerald-500/15 text-emerald-300'
+                    : 'bg-rose-500/15 text-rose-300'
+                }`}
+              >
+                {result.executed && !result.error
+                  ? result.spawned_pid
+                    ? `已拉起 pid=${result.spawned_pid}`
+                    : `完成 (exit ${result.exit_code ?? '?'})`
+                  : '未完成'}
+              </span>
+            </div>
+
+            {result.output && (
+              <pre className="mb-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded bg-ink-950 p-2 font-mono text-[11px] text-slate-300">
+                {result.output}
+              </pre>
+            )}
+            {result.error && (
+              <div className="mb-2 rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">
+                {result.error}
+              </div>
+            )}
+
+            <button
+              onClick={onRescan}
+              className="mt-1 rounded border border-ink-600 px-3 py-1 text-[11px] text-slate-300 hover:border-slate-500"
+            >
+              重新扫描确认
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

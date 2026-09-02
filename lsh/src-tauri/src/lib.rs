@@ -11,6 +11,7 @@ pub fn run() {
             commands::scan_ports,
             commands::list_services,
             commands::preview_action,
+            commands::run_action,
         ])
         .run(tauri::generate_context!())
         .expect("启动 LocalServiceHub 失败");

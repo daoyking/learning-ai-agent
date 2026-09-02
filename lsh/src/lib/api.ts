@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { PortEntry, ScanResult } from '../types'
+import type { ActionPreview, PortEntry, RunActionResult, ScanResult } from '../types'
 
 /** 自己判定，避免依赖特定版本的导出符号 */
 function isTauri(): boolean {
@@ -30,11 +30,36 @@ export async function scanPorts(): Promise<PortEntry[]> {
   return snap.ports
 }
 
-export async function previewAction(serviceId: string, action: string): Promise<string> {
+export async function previewAction(
+  serviceId: string,
+  action: string
+): Promise<ActionPreview> {
   if (!isTauri()) {
-    return '[浏览器预览模式] 启停需要 Tauri 运行环境，请用 pnpm tauri:dev 启动'
+    return {
+      service_id: serviceId,
+      action,
+      effective_action: action,
+      danger: 'none',
+      requires_confirm: false,
+      sudo_required: false,
+      command: '[浏览器预览模式] 启停需要 Tauri 运行环境，请用 pnpm tauri:dev 启动',
+      cwd: '',
+      rerouted: null,
+      note: null,
+    }
   }
-  return invoke<string>('preview_action', { serviceId, action })
+  return invoke<ActionPreview>('preview_action', { serviceId, action })
+}
+
+export async function runAction(
+  serviceId: string,
+  action: string,
+  confirmed: boolean
+): Promise<RunActionResult> {
+  if (!isTauri()) {
+    throw new Error('启停需要 Tauri 运行环境，请用 pnpm tauri:dev 启动')
+  }
+  return invoke<RunActionResult>('run_action', { serviceId, action, confirmed })
 }
 
 async function loadSnapshot(): Promise<ScanResult> {

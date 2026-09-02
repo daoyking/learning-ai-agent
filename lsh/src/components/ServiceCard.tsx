@@ -41,10 +41,10 @@ const KIND_COLOR: Record<string, string> = {
 
 interface Props {
   card: Card
-  onPreviewStart: (id: string) => void
+  onManage: (card: Card) => void
 }
 
-export function ServiceCard({ card, onPreviewStart }: Props) {
+export function ServiceCard({ card, onManage }: Props) {
   const conflict = card.port_conflict
   const sup = SUPERVISION[card.supervised ?? 'not_applicable']
 
@@ -118,15 +118,11 @@ export function ServiceCard({ card, onPreviewStart }: Props) {
             </span>
           )}
           <button
-            onClick={() => onPreviewStart(card.id)}
+            onClick={() => onManage(card)}
             className="rounded border border-ink-600 px-2 py-0.5 text-[10px] text-slate-300 transition-colors hover:border-slate-500 hover:text-slate-100"
-            title={
-              card.supervised === 'unsupervised'
-                ? '未托管的服务启动前需要先注册（bootstrap），预览会显示实际将执行的命令'
-                : 'V0.1 为 dry-run：只回显将要执行的命令，不真跑'
-            }
+            title="管理：预览并真实执行启停动作"
           >
-            {card.supervised === 'unsupervised' ? '预览注册+启动' : '预览启动命令'}
+            管理
           </button>
         </div>
       </div>
