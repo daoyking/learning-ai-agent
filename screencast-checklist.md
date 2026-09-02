@@ -42,6 +42,26 @@ for d in w2-agent-chat w3-rag-qa w4-resume-scorer w5-agent-eval; do (cd "$d" && 
 #    在 w5-agent-eval/.env 加 LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST
 ```
 
+**4) 开录前自检（30 秒，必做）**
+
+```bash
+cd w6-portfolio
+./scripts/preflight.sh          # 秒级：key / 依赖 / 端口 / 作品集文件
+./scripts/preflight.sh --test   # 完整：额外跑四个工程的离线 npm test（1–2 分钟）
+```
+
+自检会顺手清掉 `index.html` 里被可视化编辑器注入的 `data-page-node-id`
+（284 行变脏、44.7KB→64.4KB，文本内容不变，但会淹没 diff；幂等，无污染时秒退）。
+
+**5) 本地模型核对（W5 用 Ollama）**
+
+```bash
+ollama list | grep qwen2.5-coder   # 需要有 qwen2.5-coder:14b
+curl -s http://localhost:11434/api/tags > /dev/null && echo "ollama 在跑"
+```
+
+W5 的 `.env` 指向 `http://localhost:11434/v1` + `qwen2.5-coder:14b`，Ollama 没起会直接翻车。
+
 录屏工具任选：macOS 自带 `Shift+Cmd+5`、OBS、或 QuickTime。
 
 ---
