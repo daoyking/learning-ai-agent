@@ -1,0 +1,77 @@
+schema: lsh.service/v1
+id: chromadb
+name: ChromaDB
+description: 向量数据库，Odysseus 的记忆后端
+category: rag
+icon: ':chroma:'
+home: '~/Downloads/about-jindy/odysseus'
+priority: P0
+tags: [vector, rag, python]
+
+detect:
+  ports: [8100]
+  process: 'chroma run|chroma-venv'
+
+supervisor:
+  kind: script
+  detach: setsid
+  supervision:
+    check: manual
+  note: |
+    由 Odysseus 的 start.sh 一并拉起，也可单独拉起。
+    单独启动时必须显式带 --path，否则会写到一个新的空库，
+    表现为"服务正常但记忆全丢了"。
+    监管：manual —— 手工脚本拉起，没有守护进程，崩了不会自动恢复。
+  actions:
+    start:
+      cwd: '${home}'
+      cmd: './chroma-venv/bin/chroma run --host 127.0.0.1 --port 8100 --path ./data/chroma'
+      shell: '/bin/bash -lc'
+      timeout_ms: 60000
+    stop:
+      cmd: 'pkill -f "chroma run --host 127.0.0.1 --port 8100"'
+      timeout_ms: 15000
+      danger: confirm
+    status:
+      cmd: 'pgrep -f "chroma run.*--port 8100" >/dev/null && echo running || echo stopped'
+      timeout_ms: 5000
+
+health:
+  l1: { type: tcp, port: 8100, timeout_ms: 2000 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:8100/api/v1/heartbeat'
+    expect_status: 200
+    timeout_ms: 5000
+  l3:
+    - id: collections-nonempty
+      desc: 'heartbeat 通 ≠ 数据还在。持久化路径挂错会得到一个全新的空库'
+      type: http_json
+      url: 'http://127.0.0.1:8100/api/v1/collections'
+      jq: ''
+      assert: 'len(collections) > 0'
+      timeout_ms: 10000
+      interval_ms: 600000
+      cost: free
+      note: |
+        这是最隐蔽的一类数据事故：服务全绿，但 collections 是空的。
+        原因几乎总是启动时没带 --path 或指向了错误目录。
+
+config:
+  files: []
+  readonly: true
+
+logs:
+  - kind: file
+    path: '${home}/logs/chromadb.log'
+    label: 'chromadb'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+
+depends_on: []
+provides: [vector-store]
+
+playbooks: [chromadb-empty-store]
+
+danger:
+  stop_requires_confirm: true
+  impact: 'Odysseus 的记忆检索会立即失败'

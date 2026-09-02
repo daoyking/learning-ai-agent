@@ -1,0 +1,107 @@
+schema: lsh.playbook/v1
+id: host-frozen
+title: macOS Maintenance Sleep 导致长请求必超时
+# 环境级剧本：不归属任何单一服务，所以没有 service 字段
+severity: high
+category: environment
+symptom: |
+  "长请求必超时、短请求正常"。极易误判为供应商挂了或模型太慢，
+  于是去改一堆无关配置——实际是机器在睡觉。
+
+trigger:
+  any_of:
+    - log_match:
+        source: odysseus/odysseus
+        pattern: 'host timing gap|timing gap'
+        window: 2h
+        count: 1
+    - cmd:
+        run: 'pmset -g log 2>/dev/null | grep -c "Maintenance Sleep"'
+        expect_output: '[1-9][0-9]*'
+  cooldown_ms: 3600000
+
+diagnose:
+  - id: sleep-count
+    title: 统计 24h 内的 Maintenance Sleep 次数
+    exec:
+      cmd: 'pmset -g log 2>/dev/null | grep -c "Maintenance Sleep"'
+      timeout_ms: 20000
+    capture: sleep_count
+  - id: assertions
+    title: 检查当前是否持有防睡眠断言
+    exec:
+      cmd: 'pmset -g assertions 2>/dev/null | grep -i "PreventSystemSleep\|NoDisplaySleep" | head -5'
+      timeout_ms: 10000
+    capture: assertions
+    optional: true
+  - id: sleep-duration
+    title: 看每次睡眠多久
+    exec:
+      cmd: 'pmset -g log 2>/dev/null | grep -A1 "Maintenance Sleep" | grep -oE "Sleep.*for [0-9]+ sec" | tail -5'
+      timeout_ms: 20000
+    capture: sleep_duration
+    optional: true
+
+conclude:
+  - when: "sleep_count > 5"
+    root_cause: |
+      macOS 的 Maintenance Sleep 会在插电、甚至持有 NoDisplaySleepAssertion 的
+      情况下照样发生。每次 500–930 秒。
+      在此期间：本地服务进程还在、端口还在，但它们拿不到 CPU 时间片。
+      表现就是"短请求正常、长请求必超时"——因为长请求横跨了一个睡眠窗口。
+      本机实测：一天睡 324 次。
+    confidence: high
+    evidence:
+      - "pmset -g log | grep -c Maintenance → ${sleep_count} 次"
+      - "每次时长：${sleep_duration}"
+      - '日志出现 host timing gap'
+    recommended_fix: caffeinate
+  - when: "sleep_count > 0 and sleep_count <= 5"
+    root_cause: |
+      有 Maintenance Sleep 但频率不高。如果长请求超时是偶发的，
+      可能与它有关；如果是必现的，另找原因。
+    confidence: low
+    evidence:
+      - "Maintenance Sleep ${sleep_count} 次"
+    recommended_fix: caffeinate
+
+fix:
+  mode: manual
+  confirm: false
+  backup: []
+  steps:
+    - id: caffeinate
+      title: 给服务 wrapper 加 caffeinate
+      type: manual
+      instruction: |
+        【需要 sudo 的部分只给命令，请自己在终端执行】
+
+        ① 立竿见影（当前终端会话）：
+             caffeinate -ims &
+           参数含义：i=防空闲睡眠 m=防磁盘睡眠 s=防系统睡眠
+
+        ② 持久生效 —— 改服务的 launchd wrapper，在启动命令前加 caffeinate -ims
+
+        ③ 调整系统设置（需 sudo）：
+             sudo pmset -a sleep 0
+             sudo pmset -a disksleep 0
+             sudo pmset -a powernap 0
+           注意 powernap 是 Maintenance Sleep 的主要来源之一。
+
+        ④ 验证：跑一个 10 分钟以上的长请求，观察是否还出现 host timing gap
+
+verify:
+  cmd: 'pmset -g assertions | grep -c PreventSystemSleep'
+  expect: '>= 1'
+  timeout_ms: 15000
+  note: |
+    PreventSystemSleep 断言存在即说明防睡眠生效。
+    注意：即使有断言，Maintenance Sleep 仍可能发生——这是 macOS 的已知行为，
+    所以还要配合关掉 powernap。
+
+rollback: {}
+
+risk: medium
+side_effects: system-setting
+requires_sudo: true
+source: 'skills/odysseus-setup + 本机实测 2026-08-30（24h 睡眠 324 次，每次 500–930s）'

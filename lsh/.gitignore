@@ -1,0 +1,19 @@
+# Rust build artifacts (Tauri) — 2GB+，绝不入库
+/src-tauri/target/
+
+# Node / Vite
+node_modules/
+/dist/
+
+# Tauri 生成的产物
+/src-tauri/gen/
+
+# 本地运行态数据（快照由脚本生成，不入库）
+/public/snapshot.json
+
+# 探针临时凭据与日志
+.env.local
+*.log
+
+# OS
+.DS_Store

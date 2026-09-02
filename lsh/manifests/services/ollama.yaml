@@ -1,0 +1,74 @@
+schema: lsh.service/v1
+id: ollama
+name: Ollama
+description: 本地推理基座，提供 LLM 与 nomic-embed-text 嵌入
+category: inference
+icon: ':ollama:'
+priority: P0
+tags: [llm, embedding, local]
+
+detect:
+  ports: [11434]
+  process: 'ollama'
+  paths: ['/Applications/Ollama.app']
+
+supervisor:
+  kind: app
+  app: /Applications/Ollama.app
+  note: 'GUI App 自启。关闭后 API 随之消失，Odysseus 的 embedding lane 会连带失效。'
+  actions:
+    start:
+      cmd: 'open -a Ollama'
+      timeout_ms: 10000
+    stop:
+      cmd: "osascript -e 'quit app \"Ollama\"'"
+      danger: confirm
+
+health:
+  l1: { type: tcp, port: 11434, timeout_ms: 1500 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:11434/api/tags'
+    expect_status: 200
+    timeout_ms: 3000
+  l3:
+    - id: models-present
+      desc: 'API 通 ≠ 有模型。空模型列表时所有调用方会静默失败'
+      type: http_json
+      url: 'http://127.0.0.1:11434/api/tags'
+      jq: 'models'
+      assert: 'len(models) > 0'
+      cost: free
+      note: '重灌系统后模型目录会空，此时 /api/tags 返回 200 但 models 为空数组。'
+    - id: inference-works
+      desc: '真的跑一次推理，确认模型能加载且没有卡在 swap'
+      type: llm_echo
+      url: 'http://127.0.0.1:11434/api/chat'
+      model: 'qwen2.5-coder:14b'
+      timeout_ms: 60000
+      interval_ms: 600000
+      cost: cheap
+      enabled: true
+      note: |
+        本机 swap 长期 >80%。模型能列出来但加载不出来（OOM / 极慢）是常态，
+        只有真跑一次才知道。间隔 10 分钟，避免持续占用内存。
+
+config:
+  files: []
+  readonly: true
+
+logs:
+  - kind: file
+    path: '~/.ollama/logs/server.log'
+    label: 'server'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+    ignore_patterns: ['msg="truncating input prompt"']
+
+depends_on: []
+provides: [llm-api, embedding]
+
+playbooks: [host-frozen]
+
+danger:
+  stop_requires_confirm: true
+  impact: 'Odysseus 的 embedding lane、OpenClaw 的本地模型 agent 会立即失效'

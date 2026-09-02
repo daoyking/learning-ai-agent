@@ -1,0 +1,85 @@
+schema: lsh.playbook/v1
+id: dsh-npm-prefix
+title: npm prefix 被改导致插件装不上
+service: dsh
+severity: warn
+category: config
+symptom: |
+  dsh 安装插件失败，报权限或路径错误。
+  常见于本机装过多个 Node 版本管理器或多个 CLI 工具之后。
+
+trigger:
+  any_of:
+    - log_match:
+        source: dsh/stderr
+        pattern: 'EACCES|npm ERR|prefix'
+        window: 30m
+        count: 1
+  cooldown_ms: 1800000
+
+diagnose:
+  - id: npm-prefix
+    title: 检查 npm prefix
+    exec:
+      cmd: 'npm config get prefix; echo "---"; echo "global root: $(npm root -g)"'
+      timeout_ms: 20000
+    capture: npm_prefix
+  - id: which-node
+    title: 确认当前 node 来自哪里
+    exec:
+      cmd: 'which node npm; echo "---"; node -v 2>/dev/null; echo "---"; ls -ld $(npm root -g) 2>/dev/null'
+      timeout_ms: 15000
+    capture: node_path
+  - id: dsh-bin
+    title: 确认 dsh 实际解析到哪个安装
+    exec:
+      cmd: 'ls -l ~/.local/bin/dsh 2>/dev/null; echo "---"; readlink ~/.local/bin/dsh 2>/dev/null'
+      timeout_ms: 10000
+    capture: dsh_link
+
+conclude:
+  - when: "not contains(npm_prefix, '/opt/homebrew')"
+    root_cause: |
+      npm 的全局 prefix 被其他工具（另一个 Node 管理器、或某次 sudo npm i -g）
+      改到了非预期位置。dsh 装插件时用 npm 的默认 prefix，
+      于是要么装到没权限的目录（EACCES），要么装到了 dsh 不读的目录。
+    confidence: high
+    evidence:
+      - "npm prefix = ${npm_prefix}"
+      - "node/npm 路径 = ${node_path}"
+      - "dsh 软链 = ${dsh_link}"
+    recommended_fix: reset-prefix
+
+fix:
+  mode: manual
+  confirm: true
+  backup: ['~/.npmrc']
+  steps:
+    - id: reset-prefix
+      title: 把 npm prefix 改回 homebrew 的全局目录
+      type: manual
+      instruction: |
+        先备份：cp ~/.npmrc ~/.npmrc.bak-lsh-$(date +%Y%m%d-%H%M%S)
+        然后：
+           npm config set prefix /opt/homebrew
+        验证：
+           npm config get prefix   # 应该是 /opt/homebrew
+           npm root -g             # 应该是 /opt/homebrew/lib/node_modules
+        再重试 dsh 插件安装。
+
+        注意：如果 ~/.local/bin 下有其他工具的 npm 软链抢了 PATH 优先级，
+        先 `which -a npm` 看顺序，把 homebrew 的排到前面。
+
+verify:
+  cmd: 'npm config get prefix'
+  expect: 'matches.*homebrew'
+  timeout_ms: 15000
+
+rollback:
+  from_snapshot: true
+  note: 恢复 ~/.npmrc 快照。
+
+risk: low
+side_effects: writes-config
+requires_sudo: false
+source: 'skills/dsh-maintenance（npm prefix 被 TRAE 等工具改写的已知案例）'

@@ -1,0 +1,105 @@
+schema: lsh.playbook/v1
+id: odysseus-embedding-lane
+title: 缺少 embedding lane，RAG 全废
+service: odysseus
+severity: high
+category: config
+symptom: |
+  服务能起来、界面能打开，但涉及记忆检索的功能报
+  "No embedding lanes available"。属于典型的"起得来但用不了"。
+
+trigger:
+  any_of:
+    - probe: odysseus.embedding-lane
+      when: 'lanes == 0'
+    - log_match:
+        source: odysseus/odysseus
+        pattern: 'No embedding lanes|embedding lane'
+        window: 10m
+        count: 1
+  cooldown_ms: 600000
+
+diagnose:
+  - id: env-keys
+    title: 检查 .env 里的 embedding 配置
+    exec:
+      cmd: "grep -E '^(EMBEDDING_URL|EMBEDDING_MODEL|EMBEDDING_API_KEY)' '${home}/.env' | sed -E 's/(KEY=).*/\\1<redacted>/'"
+      timeout_ms: 8000
+    capture: embedding_env
+  - id: embed-endpoint
+    title: 确认 embedding 端点真的能返回向量
+    exec:
+      cmd: |
+        URL=$(grep -E '^EMBEDDING_URL=' '${home}/.env' | cut -d= -f2-)
+        MODEL=$(grep -E '^EMBEDDING_MODEL=' '${home}/.env' | cut -d= -f2-)
+        if [ -z "$URL" ]; then echo "EMBEDDING_URL 未配置"; exit 1; fi
+        curl -s -m 10 -X POST "$URL" -H 'Content-Type: application/json' \
+          -d "{\"model\":\"$MODEL\",\"input\":\"ping\"}" | head -c 200
+      timeout_ms: 20000
+    capture: embed_probe
+    optional: true
+  - id: ollama-alive
+    title: 确认本地 embedding 来源（Ollama）在线
+    exec:
+      cmd: 'curl -s -m 5 http://127.0.0.1:11434/api/tags | head -c 300'
+      timeout_ms: 10000
+    capture: ollama_tags
+
+conclude:
+  - when: "not contains(embedding_env, 'EMBEDDING_URL')"
+    root_cause: |
+      .env 里根本没有 EMBEDDING_URL。没有 embedding lane，
+      向量记忆无法写入也无法检索，而服务本身不会因此拒绝启动
+      —— 它只是在你需要检索时才报错。
+    confidence: high
+    evidence:
+      - "grep EMBEDDING_URL .env → 无匹配"
+      - '运行期报错 "No embedding lanes available"'
+    recommended_fix: add-embedding-env
+  - when: "contains(embedding_env, 'EMBEDDING_URL') and not contains(embed_probe, 'data')"
+    root_cause: |
+      配了 EMBEDDING_URL，但端点没返回向量数据。
+      常见原因：① 模型名写错 ② 端点需要走代理但没走 ③ Ollama 里没拉这个模型。
+    confidence: medium
+    evidence:
+      - "curl EMBEDDING_URL → ${embed_probe}"
+      - 'Ollama /api/tags → ${ollama_tags}'
+    recommended_fix: verify-model
+
+fix:
+  mode: assisted
+  confirm: true
+  backup:
+    - '${home}/.env'
+  steps:
+    - id: add-embedding-env
+      title: 补上 embedding 配置
+      type: manual
+      instruction: |
+        在 ${home}/.env 里补：
+          EMBEDDING_URL=http://127.0.0.1:11434/v1/embeddings
+          EMBEDDING_MODEL=nomic-embed-text
+          EMBEDDING_API_KEY=ollama
+        改完重启 Odysseus（./start.sh stop && ./start.sh）。
+        改 .env 之前客户端会先做快照。
+    - id: verify-model
+      title: 确认 embedding 模型在本机可用
+      type: manual
+      instruction: |
+        如果走 Ollama：先 `ollama pull nomic-embed-text`，
+        再 `curl http://127.0.0.1:11434/api/tags` 确认模型在列表里。
+        本机 Ollama 已装 nomic-embed-text:latest，若列表里没有说明被清过。
+
+verify:
+  probe: odysseus.embedding-lane
+  expect: 'lanes > 0'
+  timeout_ms: 60000
+
+rollback:
+  from_snapshot: true
+  note: 恢复 .env 后重启服务。
+
+risk: medium
+side_effects: writes-config
+requires_sudo: false
+source: 'skills/odysseus-setup + 本机 .env 实测（EMBEDDING_URL/MODEL/API_KEY 三项齐全）'

@@ -1,0 +1,102 @@
+schema: lsh.playbook/v1
+id: searxng-timeout
+title: SearXNG 引擎请求超时
+service: searxng
+severity: warn
+category: config
+symptom: 搜索时大部分引擎报 timeout，只有一两个能出结果，或全部超时。
+
+trigger:
+  any_of:
+    - log_match:
+        source: searxng/container
+        pattern: 'timeout|Timeout|requests.exceptions.Timeout'
+        window: 15m
+        count: 5
+    - probe: searxng.engines-reachable
+      when: 'alive < 2'
+  cooldown_ms: 900000
+
+diagnose:
+  - id: req-timeout
+    title: 检查 outgoing.request_timeout
+    exec:
+      cmd: "grep -n 'request_timeout' '${home}/data/searxng/settings.yml'"
+      timeout_ms: 8000
+    capture: request_timeout
+  - id: outgoing-proxy
+    title: 检查 outgoing.proxies 是否配置
+    exec:
+      cmd: "grep -A3 'proxies' '${home}/data/searxng/settings.yml' | head -20"
+      timeout_ms: 8000
+    capture: outgoing_proxies
+  - id: proxy-alive
+    title: 确认代理端口是否在监听
+    exec:
+      cmd: 'lsof -nP -iTCP:7890 -sTCP:LISTEN | tail -n +2 | wc -l | tr -d " "'
+      timeout_ms: 8000
+    capture: proxy_listeners
+
+conclude:
+  - when: "contains(request_timeout, '3.0') or contains(request_timeout, '3')"
+    root_cause: |
+      SearXNG 默认 request_timeout=3.0。走代理出网时代理握手 + 目标站响应
+      几乎必然超过 3 秒，于是引擎集体超时。默认配置在本机网络环境下不可用。
+    confidence: high
+    evidence:
+      - "grep request_timeout → ${request_timeout}"
+      - '容器日志出现密集 timeout'
+    recommended_fix: raise-timeout
+  - when: "proxy_listeners == 0 and contains(outgoing_proxies, '7890')"
+    root_cause: |
+      settings.yml 里配了走 7890 代理，但 7890 没有进程在监听。
+      注意：SearXNG 不读 HTTP_PROXY 环境变量，只认 settings.yml 的
+      outgoing.proxies —— 所以改环境变量对它无效，必须改这个文件。
+    confidence: high
+    evidence:
+      - "outgoing.proxies 指向 7890"
+      - 'lsof -iTCP:7890 → 0 个监听者'
+    recommended_fix: fix-proxy
+
+fix:
+  mode: assisted
+  confirm: true
+  backup:
+    - '${home}/data/searxng/settings.yml'
+  steps:
+    - id: raise-timeout
+      title: 把 outgoing.request_timeout 提到 20s
+      type: yaml_set
+      file: '${home}/data/searxng/settings.yml'
+      path: 'outgoing.request_timeout'
+      value: 20.0
+      snapshot: true
+    - id: fix-proxy
+      title: 修正 outgoing.proxies（先确认代理端口真实存在）
+      type: manual
+      instruction: |
+        SearXNG 只认 settings.yml 的 outgoing.proxies，不读环境变量。
+        代理端口活着时填 http://127.0.0.1:7890；不用代理时整段注释掉。
+    - id: restart
+      title: 重启容器
+      type: docker
+      container: odysseus-searxng
+      action: restart
+      timeout_ms: 90000
+      snapshot: false
+
+verify:
+  probe: searxng.engines-reachable
+  expect: 'alive >= 2'
+  timeout_ms: 120000
+  note: |
+    本机可用引擎只有 bing / mojeek / wikipedia / marginalia。
+    ddg、google、brave、startpage 从本机出口全被封，别指望它们。
+
+rollback:
+  from_snapshot: true
+
+risk: low
+side_effects: restart-service
+requires_sudo: false
+source: 'skills/odysseus-setup（start.sh 注释第 8 条）+ 本机实测'

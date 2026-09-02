@@ -1,0 +1,104 @@
+schema: lsh.playbook/v1
+id: searxng-no-result
+title: SearXNG 返回本地化垃圾结果
+service: searxng
+severity: high
+category: config
+symptom: |
+  搜索能返回 HTTP 200 和"结果"，但内容是 Naver 房产、日本词典页、
+  本地生活服务这类跟查询词毫不相关的本地化页面。
+
+trigger:
+  any_of:
+    - probe: searxng.search-returns-results
+      when: 'localized == true'
+    - probe: searxng.search-returns-results
+      when: 'results == 0'
+  cooldown_ms: 900000
+
+diagnose:
+  - id: default-lang
+    title: 检查 searxng 的 default_lang 设置
+    exec:
+      cmd: "grep -A1 'default_lang' '${home}/data/searxng/settings.yml'"
+      timeout_ms: 8000
+    capture: default_lang
+  - id: locale-setting
+    title: 检查 search.languages 是否被限定
+    exec:
+      cmd: "grep -A2 '^search:' -m1 '${home}/data/searxng/settings.yml' | head -20"
+      timeout_ms: 8000
+    capture: search_block
+  - id: container-running
+    title: 确认容器确实是新配置
+    exec:
+      cmd: 'docker inspect -f "{{.State.Status}} started={{.State.StartedAt}}" odysseus-searxng'
+      timeout_ms: 15000
+    capture: container_state
+
+conclude:
+  - when: "not contains(default_lang, 'en-US')"
+    root_cause: |
+      SearXNG 的 bing 引擎按 searxng_locale 生成 mkt 参数。
+      default_lang 为 all 或空时不传 mkt，Bing 就按出口 IP 猜地区，
+      返回本地化的 SERP —— 从接口看一切正常（200 + 有结果），
+      但结果全是废的。这是 L3 语义探针存在的理由：L1/L2 全绿。
+    confidence: high
+    evidence:
+      - "grep default_lang settings.yml → ${default_lang}"
+      - '实发搜索请求 → 返回本地化站点而非目标结果'
+    recommended_fix: set-default-lang
+  - when: "results == 0"
+    root_cause: |
+      一条结果都没有，通常不是语言问题，而是引擎全部超时或被封。
+      见 searxng-timeout / searxng-engines 探针。
+    confidence: medium
+    evidence:
+      - '搜索返回 0 条结果'
+      - '容器状态 ${container_state}'
+    recommended_fix: check-engines
+
+fix:
+  mode: assisted
+  confirm: true
+  backup:
+    - '${home}/data/searxng/settings.yml'
+  steps:
+    - id: set-default-lang
+      title: 把 search.default_lang 设为 en-US
+      type: yaml_set
+      file: '${home}/data/searxng/settings.yml'
+      path: 'search.default_lang'
+      value: 'en-US'
+      snapshot: true
+    - id: check-engines
+      title: 确认已启用引擎里有多少个真能出结果
+      type: manual
+      instruction: |
+        本机实测：ddg / google / brave / startpage 从本机出口全被封，
+        只有 bing / mojeek / wikipedia / marginalia 可用。
+        如果启用列表里只剩被封的引擎，结果必然为 0。
+    - id: restart
+      title: 重启容器（settings.yml 是只读挂载，必须重启才生效）
+      type: docker
+      container: odysseus-searxng
+      action: restart
+      timeout_ms: 90000
+      snapshot: false
+
+verify:
+  probe: searxng.search-returns-results
+  expect: 'results > 0 and localized == false'
+  timeout_ms: 120000
+  note: |
+    改配置后必须重启容器才生效——settings.yml 是只读挂载进容器的。
+    若仍返回本地化结果，检查是不是有 HTTP_PROXY 出口又变了地区。
+
+rollback:
+  from_snapshot: true
+  note: 恢复 settings.yml 后 docker restart。
+
+risk: low
+side_effects: restart-service
+requires_sudo: false
+source: 'skills/odysseus-setup + 本机实测 2026-08-31'

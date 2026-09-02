@@ -1,0 +1,98 @@
+schema: lsh.service/v1
+id: searxng
+name: SearXNG
+description: 自建元搜索引擎，Odysseus 联网搜索的唯一后端
+category: infra
+icon: ':searxng:'
+home: '~/Downloads/about-jindy/odysseus'
+priority: P0
+tags: [search, docker]
+
+detect:
+  ports: [8081]
+  docker: ['odysseus-searxng']
+
+supervisor:
+  kind: docker
+  container: odysseus-searxng
+  supervision:
+    check: docker_restart_policy
+    expect: 'unless-stopped'
+  note: |
+    本机唯一用到容器的组件，跟其他服务不在同一个管理平面。
+    settings.yml 是只读挂载，改完必须重启容器才生效。
+    2026-09-02 实测 RestartPolicy.Name = unless-stopped，即容器崩了 Docker 会拉起，
+    但手动 stop 后重启机器不会自启 —— 这个区别要让用户看见。
+  actions:
+    start:
+      cmd: 'docker start odysseus-searxng'
+      timeout_ms: 60000
+    stop:
+      cmd: 'docker stop odysseus-searxng'
+      timeout_ms: 60000
+      danger: confirm
+    restart:
+      cmd: 'docker restart odysseus-searxng'
+      timeout_ms: 90000
+    status:
+      cmd: 'docker inspect -f "{{.State.Status}} ({{.State.Health.Status}})" odysseus-searxng'
+      timeout_ms: 15000
+
+health:
+  l1: { type: tcp, port: 8081, timeout_ms: 2000 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:8081/healthz'
+    expect_status: 200
+    timeout_ms: 8000
+  l3:
+    - id: search-returns-results
+      desc: '健康接口通 ≠ 搜得到东西。定位错误时返回的是本地化垃圾页'
+      type: script
+      script: probes/searxng-results.mjs
+      assert: 'results > 0 && localized == false'
+      timeout_ms: 45000
+      interval_ms: 600000
+      cost: free
+      note: |
+        经典故障：default_lang 不是 en-US 时，Bing 按出口 IP 猜地区，
+        搜索结果全是 Naver 房产、日本词典页。从接口看一切正常。
+    - id: engines-reachable
+      desc: '检查已启用引擎里有多少个真的能返回结果'
+      type: script
+      script: probes/searxng-engines.mjs
+      assert: 'alive >= 2'
+      timeout_ms: 60000
+      interval_ms: 900000
+      cost: free
+      note: |
+        ── 2026-09-02 实测，与初版注释完全相反，已按实测更正 ──────────
+        初版写"只有 bing/mojeek/wikipedia/marginalia 可用"，实测跑下来是：
+          marginalia=21，其余 7 个（bing / mojeek / wikipedia / duckduckgo /
+          google / brave / startpage）全部返回 0 条。
+        即：**当前实际只有 marginalia 一个引擎在出结果**，alive=1。
+        这让 assert 'alive >= 2' 必然失败 —— 断言本身没错，是本机引擎池
+        太薄。修复方向是往 settings.yml 补引擎或修网络，而不是放宽断言。
+
+        另一个实测信号：短查询（如 "test"）会返回中文词典页这类本地化垃圾，
+        长英文 query 则干净（26 条，localized_ratio 0.15）。所以本地化检测
+        必须用普通长度的英文 query，太短会假阳性。
+
+config:
+  files: ['${home}/data/searxng/settings.yml']
+  readonly: false
+
+logs:
+  - kind: docker
+    container: odysseus-searxng
+    label: 'container'
+    ignore_patterns: ['wikipedia: 503', 'yahoo: 999']
+
+depends_on: [proxy]
+provides: [web-search]
+
+playbooks: [searxng-no-result, searxng-timeout]
+
+danger:
+  stop_requires_confirm: true
+  impact: 'Odysseus 的联网搜索与 deep research 全部失效'

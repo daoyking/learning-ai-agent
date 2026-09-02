@@ -1,0 +1,90 @@
+schema: lsh.playbook/v1
+id: proxy-dead
+title: 代理假活，出不去网
+service: proxy
+severity: critical
+category: network
+symptom: |
+  ClashX 图标在、端口在、API 也返回 200，但实际出不了网。
+  表现为"一批供应商莫名其妙 fetch failed"——极易误判为供应商问题。
+
+trigger:
+  any_of:
+    - probe: proxy.egress-reachable
+      when: 'ok == false'
+  cooldown_ms: 300000
+
+diagnose:
+  - id: api-alive
+    title: 检查 ClashX 控制 API
+    exec:
+      cmd: 'curl -s -m 5 http://127.0.0.1:9090/version; echo " exit=$?"'
+      timeout_ms: 10000
+    capture: api
+  - id: egress-test
+    title: 真的发一个外网请求
+    exec:
+      cmd: 'curl -s -m 12 -o /dev/null -w "%{http_code}" -x http://127.0.0.1:7890 https://api.openai.com 2>&1; echo " exit=$?"'
+      timeout_ms: 20000
+    capture: egress
+  - id: direct-test
+    title: 不走代理能不能出网（区分"代理坏了"和"网断了"）
+    exec:
+      cmd: 'curl -s -m 12 -o /dev/null -w "%{http_code}" --noproxy "*" https://www.baidu.com 2>&1; echo " exit=$?"'
+      timeout_ms: 20000
+    capture: direct
+
+conclude:
+  - when: "ok == false and not contains(direct, '000')"
+    root_cause: |
+      直连出网正常，走代理失败 —— 问题在代理本身：
+      订阅过期、规则集失效、或出站节点全挂。
+      进程和端口都在，所以所有"端口级"健康检查都是绿的。
+    confidence: high
+    evidence:
+      - 'ClashX API /version → ${api}'
+      - '经代理请求 → ${egress}'
+      - '直连请求 → ${direct}（正常，说明物理网络没问题）'
+    recommended_fix: fix-clashx
+  - when: "contains(direct, '000')"
+    root_cause: |
+      直连也出不去 —— 不是代理问题，是物理网络断了（Wi-Fi / 网线 / 运营商）。
+      这种情况去折腾代理配置纯属浪费时间。
+    confidence: high
+    evidence:
+      - '直连 → ${direct}（失败）'
+    recommended_fix: check-network
+
+fix:
+  mode: manual
+  confirm: false
+  backup: []
+  steps:
+    - id: fix-clashx
+      title: 在 ClashX 里处理
+      type: manual
+      instruction: |
+        ① 点菜单栏 ClashX 图标 → 确认"系统代理"是开着的
+        ② 检查订阅是否过期（Config → 更新订阅）
+        ③ 切换出站节点或开启"全局模式"复测
+        ④ 复测命令：curl -m 12 -x http://127.0.0.1:7890 https://api.openai.com
+    - id: check-network
+      title: 排查物理网络
+      type: manual
+      instruction: |
+        ① 确认 Wi-Fi 已连接且能拿到 IP
+        ② ping 网关：route -n get default | grep gateway
+        ③ 确认不是公司网络/防火墙拦截
+        ④ 网络恢复后重跑本剧本的 egress 探针
+
+verify:
+  probe: proxy.egress-reachable
+  expect: 'ok == true'
+  timeout_ms: 60000
+
+rollback: {}
+
+risk: low
+side_effects: none
+requires_sudo: false
+source: '设计推导 + 本机代理 7890 实测'

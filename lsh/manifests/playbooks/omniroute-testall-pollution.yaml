@@ -1,0 +1,80 @@
+schema: lsh.playbook/v1
+id: omniroute-testall-pollution
+title: 测试动作污染了供应商状态
+service: omniroute
+severity: warn
+category: data
+symptom: |
+  供应商 last_error 里出现 "test not supported"，
+  但手动 curl 这个供应商其实是通的。
+
+trigger:
+  any_of:
+    - log_match:
+        source: omniroute/serve
+        pattern: 'test not supported'
+        window: 30m
+        count: 2
+    - probe: omniroute.providers-live
+      when: 'live < total and live > 0'
+  cooldown_ms: 1800000
+
+diagnose:
+  - id: bad-status
+    title: 找出被污染的记录
+    sqlite_query:
+      file: '${home}/storage.sqlite'
+      sql: "SELECT id, name, test_status, last_error FROM providers WHERE last_error LIKE '%test not supported%'"
+    capture: polluted
+  - id: count-total
+    title: 统计总供应商数
+    sqlite_query:
+      file: '${home}/storage.sqlite'
+      sql: 'SELECT COUNT(*) AS c FROM providers WHERE is_active = 1'
+    capture: total_rows
+
+conclude:
+  - when: "len(polluted) > 0"
+    root_cause: |
+      "测试全部供应商"这类批量动作会给不支持 /v1/models 的供应商
+      写入 last_error = 'test not supported' 并翻转 test_status。
+      这些供应商本身是好的，只是不提供模型列表接口，
+      被误标为不可用后从可用池里被剔除。
+    confidence: high
+    evidence:
+      - 'sqlite: N 条记录 last_error 含 "test not supported"'
+      - '手动 curl 同一供应商 → 200（说明服务本身没问题）'
+    recommended_fix: clear-pollution
+
+fix:
+  mode: assisted
+  confirm: true
+  backup:
+    - '${home}/storage.sqlite'
+  steps:
+    - id: clear-pollution
+      title: 清掉被污染的测试状态与错误信息
+      type: sqlite_update
+      file: '${home}/storage.sqlite'
+      sql: "UPDATE providers SET last_error = NULL, test_status = 'unknown' WHERE last_error LIKE '%test not supported%'"
+      snapshot: true
+    - id: no-more-testall
+      title: 避免再次触发
+      type: manual
+      instruction: |
+        不要用"测试全部"这种批量动作判断可用性。
+        判断是否可用只有一条标准：真的发一条请求看有没有内容返回
+        —— 这也是 LSH 的 L3 探针做的事。
+
+verify:
+  probe: omniroute.providers-live
+  expect: 'live > 0'
+  timeout_ms: 60000
+
+rollback:
+  from_snapshot: true
+
+risk: low
+side_effects: writes-config
+requires_sudo: false
+source: '本机实测 2026-09-01'

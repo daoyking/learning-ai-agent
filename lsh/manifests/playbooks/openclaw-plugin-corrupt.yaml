@@ -1,0 +1,87 @@
+schema: lsh.playbook/v1
+id: openclaw-plugin-corrupt
+title: 插件校验失败，服务假活
+service: openclaw
+severity: high
+category: plugin
+symptom: |
+  端口在监听、/health 返回 200，但任何 agent turn 都被拒绝。
+  日志里有 "plugin verification failed"。
+
+trigger:
+  any_of:
+    - probe: openclaw.plugin-integrity
+      when: 'healthy == false'
+    - log_match:
+        source: openclaw/gateway.err
+        pattern: 'plugin verification failed|integrity check failed'
+        window: 15m
+        count: 1
+  cooldown_ms: 600000
+
+diagnose:
+  - id: plugin-list
+    title: 列出已安装插件及其状态
+    exec:
+      cmd: 'openclaw plugins list 2>&1 | head -30'
+      timeout_ms: 30000
+    capture: plugins
+    optional: true
+  - id: err-detail
+    title: 看具体是哪个插件校验失败
+    exec:
+      cmd: "grep -i 'verif\\|integrity\\|plugin' '${home}/logs/gateway.err.log' | tail -20"
+      timeout_ms: 10000
+    capture: err_lines
+
+conclude:
+  - when: "contains(err_lines, 'verification failed')"
+    root_cause: |
+      插件文件在升级/安装过程中损坏（网络中断、磁盘满、权限问题）。
+      Gateway 不会因为插件坏掉就退出——它继续监听端口并通过健康检查，
+      但拒绝执行任何需要该插件的请求。这是标准的假活。
+    confidence: high
+    evidence:
+      - "gateway.err.log：${err_lines}"
+      - '/health = 200 但 agent turn 被拒'
+    recommended_fix: reinstall-plugin
+
+fix:
+  mode: assisted
+  confirm: true
+  backup: []
+  steps:
+    - id: reinstall-plugin
+      title: 强制重装插件
+      type: exec
+      cmd: 'openclaw plugins install --force'
+      timeout_ms: 180000
+      snapshot: true
+    - id: restart
+      title: 重启 gateway
+      type: launchctl
+      label: ai.openclaw.gateway
+      action: kickstart
+      timeout_ms: 25000
+      snapshot: false
+
+verify:
+  probe: openclaw.plugin-integrity
+  expect: 'healthy == true'
+  timeout_ms: 60000
+  note: 若仍然失败，检查磁盘剩余空间——装插件时磁盘满是常见诱因。
+
+rollback:
+  steps:
+    - id: restart-again
+      type: launchctl
+      label: ai.openclaw.gateway
+      action: kickstart
+      timeout_ms: 25000
+      snapshot: false
+  note: 插件是覆盖安装，回滚靠重新 kickstart + 必要时重新 install 指定版本。
+
+risk: medium
+side_effects: restart-service
+requires_sudo: false
+source: 'skills/openclaw-troubleshooting'

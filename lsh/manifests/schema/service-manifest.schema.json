@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lsh.local/schema/service-manifest.schema.json",
+  "title": "LSH Service Manifest",
+  "description": "声明式描述一个本地/自托管服务的发现方式、生命周期、健康探针、依赖、配置、日志与排障剧本。",
+  "type": "object",
+  "required": ["schema", "id", "name", "category", "supervisor"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "lsh.service/v1",
+      "description": "Manifest 格式版本，用于未来迁移与校验。"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,30}$",
+      "description": "全局唯一标识（小写中划线），也是文件名与依赖引用的键。"
+    },
+    "name": { "type": "string", "minLength": 1, "description": "UI 显示名。" },
+    "description": { "type": "string", "description": "一句话说明这个服务是干嘛的。" },
+    "category": {
+      "type": "string",
+      "enum": ["proxy", "inference", "gateway", "rag", "workspace", "infra", "devtool"],
+      "description": "Dashboard 分组依据。"
+    },
+    "icon": { "type": "string", "description": "图标路径或内置图标名（如 :ollama:）。" },
+    "home": { "type": "string", "description": "服务根目录，可用于 ${home} 变量展开。" },
+    "version_range": {
+      "type": "string",
+      "description": "semver range，用于 drift 检测：探测失败时提示『可能已升级，请更新 manifest』。"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["P0", "P1", "P2"],
+      "default": "P1",
+      "description": "决定托盘菜单排序与是否纳入『一键启动工作环境』。"
+    },
+    "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+
+    "detect": {
+      "type": "object",
+      "description": "自动发现线索，命中任一即认为本机存在该服务。",
+      "additionalProperties": false,
+      "properties": {
+        "ports": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 65535 }, "default": [] },
+        "process": { "type": "string", "description": "进程命令行正则（对 ps 输出匹配）。" },
+        "launchd": { "type": "array", "items": { "type": "string" }, "default": [], "description": "LaunchAgent label 列表。" },
+        "docker": { "type": "array", "items": { "type": "string" }, "default": [], "description": "容器名列表。" },
+        "paths": { "type": "array", "items": { "type": "string" }, "default": [], "description": "存在即认为已安装。支持 ~。" }
+      }
+    },
+
+    "supervisor": {
+      "type": "object",
+      "description": "生命周期抽象。kind 决定启停语义；actions 为可选的命令覆盖。",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["launchd", "docker", "app", "script", "pty"],
+          "description": "launchd=系统托管 / docker=容器 / app=GUI 应用 / script=脚本脱离会话 / pty=需真实伪终端"
+        },
+        "label": { "type": "string", "description": "[launchd] LaunchAgent label。" },
+        "plist": {
+          "type": "string",
+          "description": "[launchd] plist 绝对路径（支持 ~）。job 未加载时 bootstrap 需要它 —— 只靠 label 无法加载。"
+        },
+        "container": { "type": "string", "description": "[docker] 容器名。" },
+        "app": { "type": "string", "description": "[app] .app 绝对路径或 bundle id。" },
+        "supervision": {
+          "type": "object",
+          "description": "判断服务是否处于『被监管』状态的方式。运行中但无人监管 = 崩溃后不会自动拉起，是一等风险信号。",
+          "additionalProperties": false,
+          "properties": {
+            "check": {
+              "type": "string",
+              "enum": ["launchd_job", "docker_restart_policy", "manual", "none"],
+              "default": "none",
+              "description": "launchd_job=查 launchctl 里 job 是否已加载；docker_restart_policy=查容器 RestartPolicy；manual=明确靠手工脚本拉起、无自动重启，恒判为未监管；none=不做监管判定（纯 GUI 应用，用户自己开属于预期行为，不报警）。"
+            },
+            "expect": {
+              "type": "string",
+              "description": "期望值。docker_restart_policy 下填 unless-stopped / always 等，非该值即视为未监管。"
+            }
+          }
+        },
+        "detach": {
+          "type": "string",
+          "enum": ["none", "setsid", "pty"],
+          "default": "none",
+          "description": "[script] 脱离进程组的方式。必须 setsid，nohup 会被会话回收。macOS 无 setsid 二进制，实现走 perl POSIX::setsid 包装。"
+        },
+        "pty": {
+          "type": "object",
+          "description": "[pty] 伪终端配置。用于校验 TTY 的服务（如 dsh）。",
+          "required": ["cmd"],
+          "additionalProperties": false,
+          "properties": {
+            "cmd": { "type": "string" },
+            "log": { "type": "string", "description": "pty 输出落盘路径。" },
+            "rows": { "type": "integer", "default": 50 },
+            "cols": { "type": "integer", "default": 200 },
+            "hold": {
+              "type": "boolean",
+              "default": true,
+              "description": "true 时客户端长持有 pty 主句柄，不随命令结束释放。"
+            },
+            "wrapper": {
+              "type": "string",
+              "enum": ["script", "portable-pty"],
+              "default": "script",
+              "description": "script=用 macOS 自带 /usr/bin/script -q <log> <cmd>（零依赖，推荐）；portable-pty=需要交互式写入时使用。"
+            }
+          }
+        },
+        "note": { "type": "string", "description": "给运维者看的注意事项（如『必须真 TTY』）。" },
+        "actions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bootstrap": {
+              "$ref": "#/$defs/action",
+              "description": "把服务注册进托管体系（如 launchctl bootstrap），是 start 的前置。job 未加载时直接 kickstart 会失败。"
+            },
+            "start": { "$ref": "#/$defs/action" },
+            "stop": { "$ref": "#/$defs/action" },
+            "restart": { "$ref": "#/$defs/action" },
+            "status": { "$ref": "#/$defs/action" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "launchd" } }, "required": ["kind"] },
+          "then": { "required": ["label"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "docker" } }, "required": ["kind"] },
+          "then": { "required": ["container"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "app" } }, "required": ["kind"] },
+          "then": { "required": ["app"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "pty" } }, "required": ["kind"] },
+          "then": { "required": ["actions"], "properties": { "actions": { "required": ["start"] } } }
+        }
+      ]
+    },
+
+    "health": {
+      "type": "object",
+      "description": "三级健康探针：L1 存活 / L2 就绪 / L3 语义。",
+      "additionalProperties": false,
+      "properties": {
+        "l1": { "$ref": "#/$defs/probeL1" },
+        "l2": { "$ref": "#/$defs/probeL2" },
+        "l3": { "type": "array", "items": { "$ref": "#/$defs/probeL3" }, "default": [] }
+      }
+    },
+
+    "depends_on": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "依赖的服务 id。用于拓扑排序与影响面预警。"
+    },
+    "provides": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "对外提供的能力标签，如 llm-api / embedding / web-search。"
+    },
+
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "纳入快照/回滚的普通配置文件路径。"
+        },
+        "sqlite": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "tables": { "type": "array", "items": { "type": "string" }, "default": [] }
+            }
+          },
+          "default": [],
+          "description": "SQLite 配置库，快照时走 .backup 而非文件复制（避免 WAL 不一致）。"
+        },
+        "plist": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "readonly": { "type": "boolean", "default": false, "description": "true 时禁止客户端写入，只展示。" }
+      }
+    },
+
+    "logs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/logSource" },
+      "default": []
+    },
+
+    "playbooks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "关联的 Playbook id（见 manifests/playbooks/*.yaml）。"
+    },
+
+    "env": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "default": {},
+      "description": "启动/探针时注入的环境变量覆盖。"
+    },
+
+    "danger": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stop_requires_confirm": { "type": "boolean", "default": false },
+        "impact": { "type": "string", "description": "停止该服务时的额外影响面说明。" }
+      }
+    }
+  },
+
+  "$defs": {
+    "action": {
+      "type": "object",
+      "description": "一条可执行动作。cmd 支持 ${home} / ${uid} / ${port} / ${env:VAR} 变量展开。",
+      "additionalProperties": false,
+      "properties": {
+        "cmd": { "type": "string" },
+        "cwd": { "type": "string" },
+        "shell": { "type": "string", "default": "/bin/zsh -lc", "description": "执行器，形如 /bin/zsh -lc。" },
+        "timeout_ms": { "type": "integer", "minimum": 500, "default": 30000 },
+        "env": { "type": "object", "additionalProperties": { "type": "string" }, "default": {} },
+        "danger": { "type": "string", "enum": ["none", "confirm", "sudo"], "default": "none" },
+        "sudo": { "type": "boolean", "default": false, "description": "true 时客户端只展示命令不代执行。" },
+        "note": { "type": "string", "description": "执行前给用户的说明（为什么需要这一步、会不会有副作用）。" },
+        "precondition": {
+          "type": "string",
+          "description": "执行前置条件的 expr 表达式（如 'supervised == true'）。不满足时客户端改为执行 fallback_action，而不是直接报错。"
+        },
+        "fallback_action": {
+          "type": "string",
+          "description": "precondition 不满足时改执行的动作名（指向同一 actions 下的另一个 key）。"
+        }
+      }
+    },
+    "probeL1": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "const": "tcp" },
+        "host": { "type": "string", "default": "127.0.0.1" },
+        "port": { "type": "integer" },
+        "timeout_ms": { "type": "integer", "default": 2000 }
+      },
+      "required": ["type", "port"]
+    },
+    "probeL2": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["http", "tcp"] },
+        "url": { "type": "string" },
+        "method": { "type": "string", "default": "GET" },
+        "expect_status": { "type": "integer", "default": 200 },
+        "expect_body": { "type": "string", "description": "响应体需包含的正则。" },
+        "timeout_ms": { "type": "integer", "default": 5000 }
+      },
+      "required": ["type", "url"]
+    },
+    "probeL3": {
+      "type": "object",
+      "description": "语义探针。判据只有一条：真的发出去一条请求并拿到正确结果。",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "desc": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["http_json", "script", "llm_echo", "container_exec"],
+          "default": "http_json"
+        },
+        "url": { "type": "string", "description": "[http_json] 请求地址。" },
+        "method": { "type": "string", "default": "GET" },
+        "body": { "type": "object", "additionalProperties": true, "description": "[http_json] JSON 请求体。" },
+        "jq": { "type": "string", "description": "结果路径，如 data.models。" },
+        "assert": { "type": "string", "description": "断言表达式，如 len(models) > 0。" },
+        "script": { "type": "string", "description": "[script] 相对 manifest 的脚本路径。" },
+        "container": { "type": "string", "description": "[container_exec] 容器名。" },
+        "exec": { "type": "array", "items": { "type": "string" }, "description": "[container_exec] 命令。" },
+        "model": { "type": "string", "description": "[llm_echo] 使用的模型，必须选最便宜的。" },
+        "timeout_ms": { "type": "integer", "default": 15000 },
+        "interval_ms": {
+          "type": "integer",
+          "default": 300000,
+          "description": "最小执行间隔。LLM 类探针成本高，默认 5 分钟。"
+        },
+        "enabled": { "type": "boolean", "default": true },
+        "cost": { "type": "string", "enum": ["free", "cheap", "expensive"], "default": "free" },
+        "note": { "type": "string", "description": "失败时向用户解释『为什么这很重要』。" }
+      }
+    },
+    "logSource": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["file", "docker", "command"] },
+        "path": { "type": "string", "description": "[file] 日志文件路径。" },
+        "container": { "type": "string", "description": "[docker] 容器名。" },
+        "command": { "type": "string", "description": "[command] 产生日志流的命令。" },
+        "label": { "type": "string", "description": "UI 显示名。" },
+        "rotate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_size": { "type": "string", "default": "20MB" },
+            "keep": { "type": "integer", "default": 3 },
+            "strategy": { "type": "string", "enum": ["copytruncate"], "default": "copytruncate" }
+          }
+        },
+        "ignore_patterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "已知无害的噪声（不参与告警）。"
+        }
+      }
+    }
+  }
+}

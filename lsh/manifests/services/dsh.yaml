@@ -1,0 +1,125 @@
+schema: lsh.service/v1
+id: dsh
+name: DeepSeek Harness (dsh)
+description: DeepSeek Harness CLI 的 web 服务，需要真实 TTY 才能启动
+category: devtool
+icon: ':dsh:'
+home: '~/.dsh'
+priority: P1
+tags: [cli, pty, agent]
+
+detect:
+  ports: [3080]
+  process: 'dsh( |$)'
+  launchd: ['com.jindy.dsh-web', 'com.dsh.doctor']
+  paths:
+    - '/Applications/DeepSeek Harness Desktop.app'
+    - '~/.dsh'
+
+supervisor:
+  kind: pty
+  label: com.jindy.dsh-web
+  plist: '~/Library/LaunchAgents/com.jindy.dsh-web.plist'
+  supervision:
+    check: launchd_job
+  pty:
+    cmd: '${dsh_bin} web'
+    log: '~/.lsh/pty/dsh-web.log'
+    rows: 50
+    cols: 200
+    hold: true
+    wrapper: script
+  note: |
+    【V0.1 必须支持，且本机已有成熟解法】
+
+    dsh-tui 会校验 TTY，`nohup dsh web &` 或普通子进程启动会直接崩。
+
+    【2026-09-02 实测状态】job 未加载，端口 3080 无监听，com.dsh.doctor 同样未加载。
+    两个 plist 都在 ~/Library/LaunchAgents/ 下，只是没注册进 launchd。
+    → 当前显示"未托管"，启动必须先 bootstrap 再 kickstart。
+
+    已验证的三条路径，客户端按顺序择优：
+      ① job 已注册 → `launchctl kickstart -k gui/$UID/com.jindy.dsh-web`
+         该 plist 本身就用了 `/usr/bin/script -q /tmp/dsh-web-pty.log <cmd>`
+         来分配伪终端 —— macOS 自带 script，无需引入 portable-pty。
+      ② job 未注册但 plist 在 → `launchctl bootstrap gui/$UID <plist>`
+         复用现成 plist（它已含 script -q 包装 + KeepAlive + RunAtLoad），
+         比客户端自己拼命令稳妥得多，且能顺带获得开机自启。
+      ③ 连 plist 都没有 → 客户端自己包 pty：
+         `script -q <logfile> <cmd>`（BSD script 自带于 /usr/bin）
+         配合 setsid 脱离进程组，pty 主句柄由 Rust 侧长持有。
+
+    只有当需要交互式写入（发 Ctrl-C、应答交互 prompt）时才升级到
+    portable-pty；只读日志场景用 script 足够，零依赖。
+  actions:
+    bootstrap:
+      cmd: 'launchctl bootstrap gui/${uid} ${home}/Library/LaunchAgents/com.jindy.dsh-web.plist'
+      timeout_ms: 10000
+      danger: confirm
+      note: 'plist 已自带 script -q 伪终端包装，注册即可获得 TTY 与开机自启'
+    start:
+      cmd: 'launchctl kickstart -k gui/${uid}/com.jindy.dsh-web'
+      timeout_ms: 20000
+      precondition: 'supervised == true'
+      fallback_action: bootstrap
+    stop:
+      cmd: 'launchctl kill TERM gui/${uid}/com.jindy.dsh-web'
+      timeout_ms: 15000
+      danger: confirm
+    restart:
+      cmd: 'launchctl kickstart -k -p gui/${uid}/com.jindy.dsh-web'
+      timeout_ms: 30000
+    status:
+      cmd: 'launchctl print gui/${uid}/com.jindy.dsh-web'
+      timeout_ms: 8000
+
+health:
+  l1: { type: tcp, port: 3080, timeout_ms: 2000 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:3080/'
+    expect_status: 200
+    timeout_ms: 8000
+  l3:
+    - id: loader-integrity
+      desc: 'duplicate loader entry id 会让插件加载失败，但进程照样在'
+      type: script
+      script: probes/dsh-loader-check.mjs
+      assert: 'conflicts == 0'
+      timeout_ms: 30000
+      interval_ms: 600000
+      cost: free
+      note: |
+        两个插件声明同名 loader entry 时，dsh 会抛 duplicate loader entry id。
+        端口是通的、进程是活的，但功能残缺。需要定位冲突 bundle 并升级对应插件。
+
+config:
+  files:
+    - '${home}/settings.yaml'
+    - '${home}/dsh-ssh.json'
+  readonly: false
+
+logs:
+  - kind: file
+    path: '/tmp/dsh-web-pty.log'
+    label: 'pty'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+  - kind: file
+    path: '/tmp/dsh-web-stdout.log'
+    label: 'stdout'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+  - kind: file
+    path: '/tmp/dsh-web-stderr.log'
+    label: 'stderr'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+
+depends_on: []
+provides: [agent-cli]
+
+playbooks: [dsh-duplicate-loader, dsh-npm-prefix]
+
+env:
+  DSH_HOME: '~/.deepseek-harness'
+
+danger:
+  stop_requires_confirm: false

@@ -1,0 +1,91 @@
+schema: lsh.playbook/v1
+id: openclaw-version-skew
+title: 配置版本倒挂导致 CLI 拒绝启动
+service: openclaw
+severity: high
+category: version
+symptom: |
+  升级后 CLI 报 "Unrecognized key" 并直接拒绝启动。
+  常见于降级、或升级中途被打断。
+
+trigger:
+  any_of:
+    - log_match:
+        source: openclaw/gateway.err
+        pattern: 'Unrecognized key|unknown key|schema version'
+        window: 30m
+        count: 1
+    - cmd:
+        run: 'launchctl print gui/${uid}/ai.openclaw.gateway 2>&1 | grep -q "state = running"'
+        expect_exit: 1
+  cooldown_ms: 900000
+
+diagnose:
+  - id: config-keys
+    title: 找出配置文件里的未知键
+    exec:
+      cmd: "node -e \"const c=require('${home}/openclaw.json'); console.log(Object.keys(c).join(', '))\""
+      timeout_ms: 15000
+    capture: top_keys
+  - id: migrations
+    title: 检查 meta.migrations 版本
+    exec:
+      cmd: "node -e \"const c=require('${home}/openclaw.json'); console.log(JSON.stringify(c.meta||{}))\""
+      timeout_ms: 15000
+    capture: meta_block
+  - id: cli-version
+    title: 确认 CLI 实际版本
+    exec:
+      cmd: 'openclaw --version 2>&1 | head -3'
+      timeout_ms: 15000
+    capture: cli_version
+    optional: true
+
+conclude:
+  - when: "contains(meta_block, 'migrations')"
+    root_cause: |
+      配置里的 meta.migrations 记录了一个比当前 CLI 更新的版本号。
+      CLI 启动时按"配置版本不得超前于程序版本"校验，直接拒绝加载。
+      这通常发生在：升级 → 回滚 → 配置没跟着回滚。
+    confidence: high
+    evidence:
+      - "openclaw.json meta = ${meta_block}"
+      - "CLI 版本 = ${cli_version}"
+      - '启动报错 Unrecognized key'
+    recommended_fix: reset-migrations
+
+fix:
+  mode: assisted
+  confirm: true
+  backup:
+    - '${home}/openclaw.json'
+  steps:
+    - id: reset-migrations
+      title: 清掉 meta.migrations，让 CLI 重新走迁移
+      type: manual
+      instruction: |
+        备份已经做完。执行前请先确认 CLI 版本 ${cli_version}。
+        手工编辑 ${home}/openclaw.json，删掉 meta.migrations 这个键，
+        然后重启：launchctl kickstart -k gui/$(id -u)/ai.openclaw.gateway
+        注意：如果问题反复出现，说明装的 CLI 版本比配置要求的旧，
+        需要先升级 CLI，而不是反复清配置。
+    - id: restart
+      type: launchctl
+      title: 重启 gateway
+      label: ai.openclaw.gateway
+      action: kickstart
+      timeout_ms: 20000
+      snapshot: false
+
+verify:
+  cmd: 'launchctl print gui/${uid}/ai.openclaw.gateway 2>&1 | grep "state = running"'
+  timeout_ms: 30000
+
+rollback:
+  from_snapshot: true
+  note: 恢复 openclaw.json 快照后重启。
+
+risk: medium
+side_effects: writes-config
+requires_sudo: false
+source: 'skills/openclaw-troubleshooting + 本机 ~/.openclaw/openclaw.json.bak 系列'

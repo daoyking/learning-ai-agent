@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lsh.local/schema/playbook.schema.json",
+  "title": "LSH Playbook",
+  "description": "症状 → 证据 → 根因 → 修复 → 验证 的可执行排障剧本。",
+  "type": "object",
+  "required": ["schema", "id", "title", "trigger", "diagnose", "conclude"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "const": "lsh.playbook/v1" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,50}$",
+      "description": "剧本 id，服务 manifest 通过 playbooks[] 引用它。"
+    },
+    "title": { "type": "string" },
+    "service": {
+      "type": "string",
+      "description": "归属服务 id。省略表示环境级剧本（如 host-frozen）。"
+    },
+    "severity": { "type": "string", "enum": ["info", "warn", "high", "critical"], "default": "warn" },
+    "category": {
+      "type": "string",
+      "enum": ["network", "config", "version", "resource", "data", "environment", "plugin"],
+      "default": "config"
+    },
+    "symptom": { "type": "string", "description": "用户视角看到的现象。" },
+
+    "trigger": { "$ref": "#/$defs/trigger" },
+
+    "diagnose": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/diagnoseStep" },
+      "description": "只读步骤，收集证据。绝不产生副作用。"
+    },
+
+    "conclude": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/conclusion" }
+    },
+
+    "fix": { "$ref": "#/$defs/fix" },
+    "verify": { "$ref": "#/$defs/verify" },
+    "rollback": { "$ref": "#/$defs/rollback" },
+
+    "risk": { "type": "string", "enum": ["low", "medium", "high"], "default": "medium" },
+    "side_effects": {
+      "type": "string",
+      "enum": ["none", "restart-service", "writes-config", "system-setting", "deletes-data"],
+      "default": "restart-service"
+    },
+    "requires_sudo": {
+      "type": "boolean",
+      "default": false,
+      "description": "true 时引擎只展示命令，绝不代执行（如 pmset）。"
+    },
+    "source": { "type": "string", "description": "这条经验来自哪里（skill / issue / 实测日期）。" }
+  },
+
+  "$defs": {
+    "trigger": {
+      "type": "object",
+      "description": "满足任一/全部条件即匹配。条件只有三种来源：探针、日志、命令。",
+      "additionalProperties": false,
+      "properties": {
+        "any_of": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
+        "all_of": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
+        "cooldown_ms": {
+          "type": "integer",
+          "default": 600000,
+          "description": "同一剧本的重复触发冷却，避免告警轰炸。"
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "probe": {
+          "type": "string",
+          "description": "探针引用，形如 omniroute.providers-live（service.probeId）。"
+        },
+        "when": { "type": "string", "description": "断言表达式，如 'live == 0'。" },
+        "log_match": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source": { "type": "string", "description": "日志源，形如 omniroute/serve（service/logLabel）。" },
+            "pattern": { "type": "string" },
+            "window": { "type": "string", "default": "15m" },
+            "count": { "type": "integer", "default": 1 }
+          },
+          "required": ["pattern"]
+        },
+        "cmd": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "run": { "type": "string" },
+            "expect_exit": { "type": "integer", "default": 0 },
+            "expect_output": { "type": "string" },
+            "expect_not_output": { "type": "string" }
+          },
+          "required": ["run"]
+        }
+      }
+    },
+    "diagnoseStep": {
+      "type": "object",
+      "required": ["id", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "exec": { "$ref": "#/$defs/cmdSpec" },
+        "read_file": { "type": "string", "description": "只读查看文件内容（快照后安全读取）。" },
+        "sqlite_query": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "file": { "type": "string" },
+            "sql": { "type": "string" }
+          },
+          "required": ["file", "sql"]
+        },
+        "capture": { "type": "string", "description": "把输出存为变量，供 conclude 引用。" },
+        "optional": { "type": "boolean", "default": false, "description": "失败不阻断诊断。" }
+      }
+    },
+    "conclusion": {
+      "type": "object",
+      "required": ["when", "root_cause"],
+      "additionalProperties": false,
+      "properties": {
+        "when": { "type": "string", "description": "基于诊断变量的断言表达式。" },
+        "root_cause": { "type": "string" },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"], "default": "medium" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "证据链：每条都必须是可复现的命令 + 输出，不允许臆测。"
+        },
+        "recommended_fix": { "type": "string", "description": "指向 fix 中某个 step 的 id，或 manual 说明。" }
+      }
+    },
+    "fix": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["manual", "assisted", "auto"],
+          "default": "manual",
+          "description": "manual=只给命令（V0.2 默认） / assisted=确认后执行（V0.3） / auto=低风险自动执行"
+        },
+        "confirm": { "type": "boolean", "default": true },
+        "backup": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/fixStep" }, "default": [] }
+      }
+    },
+    "fixStep": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["exec", "sqlite_update", "yaml_set", "file_write", "docker", "launchctl", "manual"],
+          "default": "exec"
+        },
+        "cmd": { "type": "string", "description": "[exec] 命令。" },
+        "cwd": { "type": "string" },
+        "file": { "type": "string", "description": "[sqlite_update|yaml_set|file_write] 目标文件。" },
+        "sql": { "type": "string", "description": "[sqlite_update] 更新语句。" },
+        "path": { "type": "string", "description": "[yaml_set] 点分路径，如 search.default_lang。" },
+        "value": { "description": "[yaml_set|file_write] 目标值。" },
+        "container": { "type": "string", "description": "[docker] 容器名。" },
+        "action": { "type": "string", "description": "[docker|launchctl] 动作。" },
+        "label": { "type": "string", "description": "[launchctl] job label。" },
+        "timeout_ms": { "type": "integer", "default": 30000 },
+        "instruction": { "type": "string", "description": "[manual] 给用户的操作指引。" },
+        "snapshot": {
+          "type": "boolean",
+          "default": true,
+          "description": "执行前对该步涉及的文件做快照。"
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "probe": { "type": "string" },
+        "expect": { "type": "string" },
+        "cmd": { "type": "string" },
+        "timeout_ms": { "type": "integer", "default": 60000 },
+        "note": { "type": "string", "description": "验证不通过时的后续建议。" }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from_snapshot": { "type": "boolean", "default": true },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/fixStep" }, "default": [] },
+        "note": { "type": "string" }
+      }
+    },
+    "cmdSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cmd": { "type": "string" },
+        "cwd": { "type": "string" },
+        "timeout_ms": { "type": "integer", "default": 15000 }
+      },
+      "required": ["cmd"]
+    }
+  }
+}

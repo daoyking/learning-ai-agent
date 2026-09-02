@@ -1,0 +1,109 @@
+schema: lsh.playbook/v1
+id: omniroute-ghost-proxy
+title: 幽灵代理端口导致供应商集体失败
+service: omniroute
+severity: high
+category: network
+symptom: |
+  面板显示供应商 is_active=1，但所有调用报 network_error / fetch failed。
+  极易误判为"供应商挂了"或"额度用完了"。
+
+trigger:
+  any_of:
+    - probe: omniroute.providers-live
+      when: 'live == 0'
+    - log_match:
+        source: omniroute/serve
+        pattern: 'ECONNREFUSED|fetch failed|network_error'
+        window: 10m
+        count: 3
+  cooldown_ms: 600000
+
+diagnose:
+  - id: proxy-settings
+    title: 检查数据库里的代理开关
+    sqlite_query:
+      file: '${home}/storage.sqlite'
+      sql: "SELECT key, value FROM settings WHERE key LIKE '%proxy%'"
+    capture: proxy_rows
+  - id: proxy-port-alive
+    title: 检查代理端口是否真的有进程在监听
+    exec:
+      cmd: 'lsof -nP -iTCP:7890 -sTCP:LISTEN | tail -n +2 | wc -l | tr -d " "'
+      timeout_ms: 10000
+    capture: proxy_listeners
+  - id: env-proxy
+    title: 检查是否残留已失效的代理环境变量
+    exec:
+      cmd: 'echo "http=$(launchctl getenv HTTP_PROXY 2>/dev/null)"; echo "https=$(launchctl getenv HTTPS_PROXY 2>/dev/null)"'
+      timeout_ms: 8000
+    capture: env_proxy
+    optional: true
+
+conclude:
+  - when: "contains(proxy_rows, 'proxy_enabled') and proxy_listeners == 0 and live == 0"
+    root_cause: |
+      数据库里开着代理（proxy_enabled=1），但代理端口已经没有任何进程在监听——
+      一个"幽灵代理端口"。OmniRoute 会把每个供应商的请求都发往这个死端口，
+      于是全部 ECONNREFUSED。
+      注意：供应商在数据库里仍然是 is_active=1，因为失败发生在网络层，
+      数据库状态不会被回写。这正是"活着 ≠ 能用"的典型。
+    confidence: high
+    evidence:
+      - 'sqlite3 storage.sqlite "SELECT … LIKE %proxy%" → proxy_enabled=1'
+      - 'lsof -nP -iTCP:7890 -sTCP:LISTEN → 0 个监听者'
+      - 'L3 探针实发请求 → 0 个供应商返回内容'
+    recommended_fix: disable-proxy
+  - when: "proxy_listeners == 0 and live == 0"
+    root_cause: |
+      代理端口无监听者，但数据库里查不到 proxy 相关配置。
+      可能是环境变量里的 HTTP_PROXY 在起作用（launchd job 的环境变量）。
+    confidence: medium
+    evidence:
+      - 'lsof -iTCP:7890 → 0 个监听者'
+      - 'env_proxy = ${env_proxy}'
+    recommended_fix: check-env
+
+fix:
+  mode: assisted
+  confirm: true
+  backup:
+    - '${home}/storage.sqlite'
+  steps:
+    - id: disable-proxy
+      title: 关闭数据库里的代理开关
+      type: sqlite_update
+      file: '${home}/storage.sqlite'
+      sql: "UPDATE settings SET value = '0' WHERE key = 'proxy_enabled'"
+      snapshot: true
+    - id: check-env
+      title: 清理 launchd 环境里的代理变量（需人工确认变量来源）
+      type: manual
+      instruction: |
+        如果上一步没解决，检查 wrapper 脚本里是否注入了 HTTP_PROXY。
+        本机已知：Odysseus 的 start.sh 会探测 7890 通才设置代理，
+        但 OmniRoute 的 launchd job 是静态注入的，可能拿到过期端口。
+    - id: restart
+      title: 重启 OmniRoute
+      type: launchctl
+      label: ai.omniroute.server
+      action: kickstart
+      timeout_ms: 20000
+      snapshot: false
+
+verify:
+  probe: omniroute.providers-live
+  expect: 'live > 0'
+  timeout_ms: 90000
+  note: |
+    若仍为 0，说明代理不是唯一原因，继续查：
+    ① 供应商 API key 是否过期 ② 配额是否耗尽 ③ 是否需要代理但当前被关掉了。
+
+rollback:
+  from_snapshot: true
+  note: 恢复 storage.sqlite 快照后重新 kickstart。
+
+risk: medium
+side_effects: writes-config
+requires_sudo: false
+source: 'skills/openclaw-troubleshooting + 本机实测 2026-09-01（35 个供应商 is_active=1，实发请求 0 个可用）'

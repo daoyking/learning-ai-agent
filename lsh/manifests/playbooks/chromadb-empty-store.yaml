@@ -1,0 +1,85 @@
+schema: lsh.playbook/v1
+id: chromadb-empty-store
+title: ChromaDB 连到了一个空库
+service: chromadb
+severity: critical
+category: data
+symptom: |
+  服务全绿（heartbeat 200），但 collections 是空的——
+  记忆"消失"了。这是最隐蔽的一类数据事故。
+
+trigger:
+  any_of:
+    - probe: chromadb.collections-nonempty
+      when: 'collections == 0'
+  cooldown_ms: 3600000
+
+diagnose:
+  - id: running-cmd
+    title: 看进程实际用的 --path 是什么
+    exec:
+      cmd: 'ps -o command= -p $(lsof -nP -iTCP:8100 -sTCP:LISTEN -t | head -1) 2>/dev/null'
+      timeout_ms: 10000
+    capture: chroma_cmd
+  - id: data-dir
+    title: 检查预期数据目录是否真的有内容
+    exec:
+      cmd: "du -sh '${home}/data/chroma' 2>/dev/null; ls -1 '${home}/data/chroma' 2>/dev/null | head -5"
+      timeout_ms: 15000
+    capture: data_dir
+  - id: stray-dirs
+    title: 找找是不是在别处建了新库
+    exec:
+      cmd: "find '${home}' -maxdepth 3 -name 'chroma.sqlite3' -newermt '-7 days' 2>/dev/null | head -10"
+      timeout_ms: 30000
+    capture: stray
+    optional: true
+
+conclude:
+  - when: "not contains(chroma_cmd, '--path')"
+    root_cause: |
+      Chroma 启动时没带 --path，于是用默认路径建了一个全新的空库。
+      旧数据还在磁盘上，只是没人指向它了。
+      服务一切正常（heartbeat 200、API 全通），只有 L3 探针能发现。
+    confidence: high
+    evidence:
+      - "ps 输出不含 --path → ${chroma_cmd}"
+      - 'collections 数量为 0'
+    recommended_fix: restart-with-path
+  - when: "collections == 0 and len(stray) > 1"
+    root_cause: |
+      磁盘上存在多个 chroma.sqlite3，当前进程指到了错的那个。
+    confidence: medium
+    evidence:
+      - "近期出现过的 chroma.sqlite3：${stray}"
+    recommended_fix: restart-with-path
+
+fix:
+  mode: manual
+  confirm: true
+  backup: []
+  steps:
+    - id: restart-with-path
+      title: 带正确 --path 重启
+      type: manual
+      instruction: |
+        涉及数据恢复，只给命令不自动执行：
+          1. 先停：pkill -f "chroma run --host 127.0.0.1 --port 8100"
+          2. 确认数据目录：du -sh ~/Downloads/about-jindy/odysseus/data/chroma
+          3. 带路径重启：
+             ./chroma-venv/bin/chroma run --host 127.0.0.1 --port 8100 \
+               --path ./data/chroma
+          4. 重启后确认 collections 数量恢复
+        如果原数据目录被覆盖过，先别动磁盘，考虑用 Time Machine 恢复。
+
+verify:
+  probe: chromadb.collections-nonempty
+  expect: 'collections > 0'
+  timeout_ms: 60000
+
+rollback: {}
+
+risk: high
+side_effects: deletes-data
+requires_sudo: false
+source: '设计推导 + ChromaDB 默认路径行为'

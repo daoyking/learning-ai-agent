@@ -1,0 +1,98 @@
+schema: lsh.playbook/v1
+id: log-explosion
+title: 日志文件爆炸（崩溃循环）
+severity: high
+category: resource
+symptom: |
+  磁盘空间莫名减少，某个日志文件涨到 GB 级。
+  本机曾出现过 1.3GB 的单文件日志。
+
+trigger:
+  any_of:
+    - cmd:
+        run: |
+          find ~/Library/Logs ~/.omniroute/logs ~/.openclaw/logs -type f -size +20M 2>/dev/null | head -5
+        expect_output: '.+'
+    - log_match:
+        source: omniroute/launchd-stderr
+        pattern: 'ThrottleInterval|respawn too fast|exited with code'
+        window: 10m
+        count: 10
+  cooldown_ms: 1800000
+
+diagnose:
+  - id: big-files
+    title: 找出超过 20MB 的日志文件
+    exec:
+      cmd: |
+        find ~/Library/Logs ~/.omniroute/logs ~/.openclaw/logs \
+          ~/Downloads/about-jindy/odysseus/logs /tmp -maxdepth 2 -type f \
+          -size +20M -exec ls -lh {} \; 2>/dev/null | awk '{print $5, $9}' | head -10
+      timeout_ms: 60000
+    capture: big_files
+  - id: growth-rate
+    title: 看它还在长吗（判断是否是活的崩溃循环）
+    exec:
+      cmd: |
+        F=$(find ~/Library/Logs ~/.omniroute/logs ~/.openclaw/logs -type f -size +20M 2>/dev/null | head -1)
+        [ -z "$F" ] && { echo "无大文件"; exit 0; }
+        A=$(stat -f%z "$F"); sleep 5; B=$(stat -f%z "$F")
+        echo "$F: ${A} -> ${B} (+$((B-A)) bytes / 5s)"
+      timeout_ms: 30000
+    capture: growth
+    optional: true
+
+conclude:
+  - when: "len(big_files) > 0"
+    root_cause: |
+      launchd 的 KeepAlive 不提供日志轮转。一个崩溃循环的服务
+      会在几十秒内刷出上百 MB 日志。
+      真正的故障不是"磁盘满了"，而是"有个服务在反复崩溃"——
+      只轮转日志等于把报警器的电池拆了，必须同时定位崩溃源。
+    confidence: high
+    evidence:
+      - "超过 20MB 的日志：${big_files}"
+      - "增长速率：${growth}"
+    recommended_fix: rotate-then-diagnose
+
+fix:
+  mode: assisted
+  confirm: true
+  backup: []
+  steps:
+    - id: rotate-then-diagnose
+      title: 立即轮转（copytruncate，不能用 mv）
+      type: manual
+      instruction: |
+        必须用 copytruncate，不能 mv —— launchd 持有 fd，
+        mv 之后进程会继续往已删除的 inode 写，磁盘不释放。
+           cp big.log big.log.1 && : > big.log
+        然后立刻看 big.log.1 的末尾 50 行找崩溃原因：
+           tail -50 big.log.1
+        如果是 ThrottleInterval 触发的重启风暴，先 launchctl bootout 停掉它，
+        修好根因再重新 kickstart。
+    - id: find-crash-loop
+      title: 定位崩溃循环的服务
+      type: manual
+      instruction: |
+        查哪些 job 在反复重启：
+           launchctl list | grep -v '^-'
+        退出码非 0 且 PID 频繁变化的就是崩溃循环源。
+        本机曾出现 com.clawdbot.gateway.plist.disabled 这类残留 job，
+        属于同类问题的历史遗留。
+
+verify:
+  cmd: |
+    find ~/Library/Logs ~/.omniroute/logs ~/.openclaw/logs -type f -size +20M 2>/dev/null | wc -l
+  expect: '== 0'
+  timeout_ms: 60000
+  note: |
+    轮转只是止血。如果 24h 内又涨到 20MB，说明崩溃源没找到，
+    回到 find-crash-loop 步骤。
+
+rollback: {}
+
+risk: low
+side_effects: writes-config
+requires_sudo: false
+source: '本机实测 2026-08（僵尸服务 KeepAlive 崩溃循环刷出 1.3GB 日志）'

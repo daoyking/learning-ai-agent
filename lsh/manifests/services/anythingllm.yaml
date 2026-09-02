@@ -1,0 +1,76 @@
+schema: lsh.service/v1
+id: anythingllm
+name: AnythingLLM
+description: RAG 客户端，经 com.anythingllm.web-proxy 提供 8888 Web 入口
+category: workspace
+icon: ':anythingllm:'
+priority: P1
+tags: [rag, electron]
+
+detect:
+  # ⚠️ 2026-09-02 实测修正：AnythingLLM 的 Web 入口是 8888，不是 3001。
+  # 3001 在当时被 w2-agent-chat/server/index.ts 占用 —— 端口通 ≠ 服务对。
+  # 只看端口会把它判成"AnythingLLM 在线"，实际探测的是另一个项目。
+  # 这也是 detect 必须同时约束 process 而不能只看 ports 的原因。
+  ports: [8888]
+  process: 'AnythingLLM'
+  launchd: ['com.anythingllm.web-proxy']
+  paths: ['/Applications/AnythingLLM.app']
+
+supervisor:
+  kind: app
+  app: /Applications/AnythingLLM.app
+  note: |
+    Electron 主进程 + com.anythingllm.web-proxy 这个 LaunchAgent 共同提供 8888。
+    关 App 不一定带走 proxy job，会留下一个指向已死后端的代理。
+    判断存活要同时看进程和 8888 是否真返回 200。
+  actions:
+    start:
+      cmd: 'open -a AnythingLLM'
+      timeout_ms: 20000
+    stop:
+      cmd: "osascript -e 'quit app \"AnythingLLM\"'"
+      timeout_ms: 15000
+      danger: confirm
+    status:
+      cmd: 'pgrep -x AnythingLLM >/dev/null && echo running || echo stopped'
+      timeout_ms: 5000
+
+health:
+  l1: { type: tcp, port: 8888, timeout_ms: 2000 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:8888/'
+    expect_status: 200
+    timeout_ms: 8000
+  l3:
+    - id: workspace-documents
+      desc: 'workspace 里没有文档时 RAG 全绿也答不出东西'
+      type: script
+      script: probes/anythingllm-workspace.mjs
+      assert: 'documents > 0'
+      timeout_ms: 20000
+      interval_ms: 900000
+      cost: free
+      note: |
+        AnythingLLM 的 /api/v1/* 需要 API key。探针在无凭据时必须
+        明确返回 needs_credentials，而不是 documents: 0 假装通过 ——
+        那是另一种形式的假活。凭据从环境变量 LSH_ANYTHINGLLM_KEY 读取。
+
+config:
+  files: []
+  readonly: true
+
+logs:
+  - kind: file
+    path: '~/Library/Logs/AnythingLLM.log'
+    label: 'app'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+
+depends_on: [ollama]
+provides: [rag-ui]
+
+playbooks: []
+
+danger:
+  stop_requires_confirm: false

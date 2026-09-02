@@ -1,0 +1,60 @@
+schema: lsh.service/v1
+id: proxy
+name: ClashX 代理
+description: 系统代理出口，一批外部供应商与 SearXNG 出网的唯一通道
+category: proxy
+icon: ':proxy:'
+priority: P0
+tags: [infra, network, prerequisite]
+
+detect:
+  ports: [7890]
+  process: 'ClashX|clash'
+  paths: ['/Applications/ClashX.app']
+
+supervisor:
+  kind: app
+  app: /Applications/ClashX.app
+  note: |
+    全局前置依赖。它挂了不会有任何服务报"代理故障"，只会表现为
+    一批供应商莫名其妙 fetch failed —— 这是本机最容易被误判的故障。
+  actions:
+    start:
+      cmd: 'open -a ClashX'
+      timeout_ms: 8000
+    stop:
+      cmd: "osascript -e 'quit app \"ClashX\"'"
+      danger: confirm
+
+health:
+  l1: { type: tcp, port: 7890, timeout_ms: 1500 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:9090/version'
+    expect_status: 200
+    timeout_ms: 3000
+  l3:
+    - id: egress-reachable
+      desc: '端口活着但出不去网 = 假代理。必须真的发一个外网请求'
+      type: script
+      script: probes/proxy-egress.mjs
+      assert: 'ok == true'
+      timeout_ms: 10000
+      interval_ms: 120000
+      cost: free
+      note: |
+        代理进程在、端口在，但规则集失效或订阅过期时出网会直接失败。
+        此时所有"供应商挂了"的判断都是错的，根因在这里。
+
+config:
+  files: []
+  readonly: true
+  plist: []
+
+logs: []
+
+playbooks: [proxy-dead]
+
+danger:
+  stop_requires_confirm: true
+  impact: '停止后 OmniRoute 外部供应商、SearXNG 出网、Odysseus 联网搜索将全部失败'

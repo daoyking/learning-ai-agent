@@ -1,0 +1,118 @@
+schema: lsh.service/v1
+id: omniroute
+name: OmniRoute
+description: 本地模型聚合网关，把多供应商账号收敛成一个 OpenAI 兼容端点
+category: gateway
+icon: ':omniroute:'
+home: '~/.omniroute'
+priority: P0
+tags: [llm, aggregator, sqlite-config]
+
+detect:
+  ports: [20128]
+  process: 'omniroute|node.*omniroute'
+  launchd: ['ai.omniroute.server']
+  paths: ['~/.omniroute']
+
+supervisor:
+  kind: launchd
+  label: ai.omniroute.server
+  plist: '~/Library/LaunchAgents/ai.omniroute.server.plist'
+  supervision:
+    check: launchd_job
+  note: |
+    ── 2026-09-02 实测，推翻了初版假设 ──────────────────────────
+    初版写"只用 kickstart 绝不 bootstrap"，是错的：
+      · plist 存在（~/Library/LaunchAgents/ai.omniroute.server.plist）
+      · 但 launchctl list 里查无此 job —— 从未加载过
+      · 进程却在跑：node .../omniroute.mjs serve，PPID=1，已存活 1 天 5 小时
+    也就是说：**服务在跑，但没人监管**。崩了不会自动拉起，重开机会丢。
+    这是 LSH 要暴露的核心风险之一 —— 状态灯不能只看端口。
+
+    正确语义：
+      · job 已加载   → kickstart -k 重启
+      · job 未加载   → 必须先 bootstrap（需 plist 路径），再 kickstart
+                       直接 kickstart 会失败，UI 要把它标成"未托管"而不是"启动失败"
+    bootstrap 属于写操作，V0.2 只做 dry-run 预览，V0.3 才真正执行。
+  actions:
+    # job 未加载时的前置动作。客户端探测到 supervision=false 就把这个动作顶到最前面。
+    bootstrap:
+      cmd: 'launchctl bootstrap gui/${uid} ${home}/Library/LaunchAgents/ai.omniroute.server.plist'
+      timeout_ms: 10000
+      danger: confirm
+      note: '注册 job，不启动进程；随后仍需 start'
+    start:
+      cmd: 'launchctl kickstart -k gui/${uid}/ai.omniroute.server'
+      timeout_ms: 15000
+      precondition: 'supervised == true'
+      fallback_action: bootstrap
+    stop:
+      cmd: 'launchctl kill TERM gui/${uid}/ai.omniroute.server'
+      timeout_ms: 10000
+      danger: confirm
+    restart:
+      cmd: 'launchctl kickstart -k -p gui/${uid}/ai.omniroute.server'
+      timeout_ms: 20000
+    status:
+      cmd: 'launchctl print gui/${uid}/ai.omniroute.server'
+      timeout_ms: 5000
+
+health:
+  l1: { type: tcp, port: 20128, timeout_ms: 1500 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:20128/v1/models'
+    expect_status: 200
+    timeout_ms: 5000
+  l3:
+    - id: providers-live
+      desc: 'is_active=1 完全不可信。必须真的挑供应商发一条请求'
+      type: script
+      script: probes/omniroute-providers.mjs
+      assert: 'live > 0'
+      timeout_ms: 30000
+      interval_ms: 300000
+      cost: cheap
+      note: |
+        本机实测：35 个供应商 is_active=1，实发请求 0 个可用（幽灵代理端口导致
+        集体 ECONNREFUSED）。数据库状态 ≠ 实际可用，这是 LSH 存在的理由之一。
+
+config:
+  files: ['${home}/.env']
+  sqlite:
+    # 2026-09-02 实测校准：供应商表实际叫 provider_connections（不是 providers）。
+    # 关键列：is_active / test_status / error_code / last_error / proxy_enabled / last_ping_at
+    - path: '${home}/storage.sqlite'
+      tables:
+        - provider_connections
+        - upstream_proxy_config
+        - proxy_registry
+        - proxy_assignments
+  readonly: false
+
+logs:
+  - kind: file
+    path: '${home}/logs/serve.log'
+    label: 'serve'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+  - kind: file
+    path: '${home}/logs/launchd-stdout.log'
+    label: 'launchd-stdout'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+  - kind: file
+    path: '${home}/logs/launchd-stderr.log'
+    label: 'launchd-stderr'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+    ignore_patterns: ['ExperimentalWarning']
+
+depends_on: [proxy]
+provides: [llm-api]
+
+playbooks:
+  - omniroute-ghost-proxy
+  - omniroute-testall-pollution
+  - log-explosion
+
+danger:
+  stop_requires_confirm: true
+  impact: 'OpenClaw 与所有经 OmniRoute 的调用将失去模型来源'

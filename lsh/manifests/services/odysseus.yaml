@@ -1,0 +1,124 @@
+schema: lsh.service/v1
+id: odysseus
+name: Odysseus
+description: 个人 AI 工作空间，聚合模型端点 / 向量记忆 / 联网搜索 / 多邮箱
+category: workspace
+icon: ':odysseus:'
+home: '~/Downloads/about-jindy/odysseus'
+priority: P0
+tags: [workspace, rag, python]
+
+detect:
+  ports: [7001]
+  process: 'uvicorn app:app|agent_loop'
+  paths: ['~/Downloads/about-jindy/odysseus']
+
+supervisor:
+  kind: script
+  detach: setsid
+  supervision:
+    check: manual
+  note: |
+    监管：manual —— 手工 ./start.sh 拉起，无守护，崩了不会自动恢复。
+    想变成真托管得自己写个 LaunchAgent（V0.3 的"一键托管"可以做）。
+
+    必须用 start.sh（它处理了代理探测、no_proxy、SearXNG 容器拉起）。
+    子进程必须由客户端用 POSIX::setsid 脱离进程组 —— macOS 没有 setsid 二进制，
+    实现走 `perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV'`。
+    `cmd &` / `nohup &` 都会随会话回收。
+  actions:
+    start:
+      cwd: '${home}'
+      cmd: './start.sh'
+      shell: '/bin/bash -lc'
+      timeout_ms: 120000
+      env:
+        ODYSSEUS_PORT: '7001'
+    stop:
+      cwd: '${home}'
+      cmd: './start.sh stop'
+      shell: '/bin/bash -lc'
+      timeout_ms: 60000
+      danger: confirm
+    restart:
+      cwd: '${home}'
+      cmd: './start.sh stop && sleep 2 && ./start.sh'
+      shell: '/bin/bash -lc'
+      timeout_ms: 180000
+    status:
+      cwd: '${home}'
+      cmd: './start.sh status'
+      shell: '/bin/bash -lc'
+      timeout_ms: 20000
+
+health:
+  l1: { type: tcp, port: 7001, timeout_ms: 2000 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:7001/api/health'
+    expect_status: 200
+    timeout_ms: 5000
+  l3:
+    - id: models-real-count
+      desc: '/api/models 报 0 是假象，必须穿透到 model-endpoints 逐个查'
+      type: script
+      script: probes/odysseus-models.mjs
+      assert: 'total > 0'
+      timeout_ms: 20000
+      interval_ms: 300000
+      cost: free
+      note: |
+        /api/models 常在端点未完全注册时返回 0，看起来像"没有模型"，
+        实际 /api/model-endpoints/{id}/models 是有内容的。别被顶层接口骗。
+    - id: embedding-lane
+      desc: 'embedding lane 未配时服务起得来但 RAG 全废'
+      type: script
+      script: probes/odysseus-embedding.mjs
+      assert: 'lanes > 0'
+      timeout_ms: 20000
+      interval_ms: 300000
+      cost: free
+      note: '检查 .env 的 EMBEDDING_URL / EMBEDDING_MODEL 是否真的可用。'
+    - id: web-search-live
+      desc: '联网搜索是否真能出结果（依赖 SearXNG 定位正确）'
+      type: script
+      script: probes/odysseus-websearch.mjs
+      assert: 'results > 0'
+      timeout_ms: 45000
+      interval_ms: 600000
+      cost: free
+      note: |
+        SearXNG 的 bing 引擎按 locale 生成 mkt 参数，locale 不对时
+        会返回 Naver 房产、日本词典页这类本地化垃圾 —— 搜索"能用"但结果是废的。
+
+config:
+  files:
+    - '${home}/.env'
+    - '${home}/data/searxng/settings.yml'
+  sqlite:
+    - path: '${home}/data/app.db'
+      tables: [model_endpoints, settings]
+  readonly: false
+
+logs:
+  - kind: file
+    path: '${home}/logs/odysseus.log'
+    label: 'odysseus'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+    ignore_patterns: ['wikipedia: 503', 'capture() takes 1 positional argument']
+  - kind: file
+    path: '${home}/logs/chromadb.log'
+    label: 'chromadb'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+
+depends_on: [chromadb, searxng, ollama]
+provides: [ai-workspace-api, rag, web-search]
+
+playbooks:
+  - searxng-no-result
+  - odysseus-embedding-lane
+  - host-frozen
+
+danger:
+  stop_requires_confirm: true
+  impact: '一体化工作台整体下线；start.sh stop 会一并停掉 ChromaDB 与 SearXNG 容器'

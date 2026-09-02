@@ -1,0 +1,110 @@
+schema: lsh.service/v1
+id: openclaw
+name: OpenClaw Gateway
+description: 自托管 AI Gateway，统一管理 provider / plugin / agent
+category: gateway
+icon: ':openclaw:'
+home: '~/.openclaw'
+priority: P0
+tags: [gateway, agent, plugins]
+
+detect:
+  ports: [18789]
+  process: 'openclaw'
+  launchd: ['ai.openclaw.gateway']
+  paths: ['~/.openclaw']
+
+supervisor:
+  kind: launchd
+  label: ai.openclaw.gateway
+  plist: '~/Library/LaunchAgents/ai.openclaw.gateway.plist'
+  supervision:
+    check: launchd_job
+  note: |
+    已知坑：
+    1. 配置版本倒挂（升级后 meta.migrations 超前）时 CLI 直接拒绝启动
+    2. 插件校验失败会拒绝 report ready —— 端口在但不接受请求
+    3. ~/Library/LaunchAgents 下存在 ai.openclaw.gateway.plist.bak-* 与
+       com.clawdbot.gateway.plist.disabled 两个历史残留，别误当现行 job
+    4. 【2026-09-02 实测】job 未加载，18789 无监听。同 omniroute 的情况：
+       plist 在、job 不在、服务没跑。启动路径必须是 bootstrap → kickstart。
+  actions:
+    bootstrap:
+      cmd: 'launchctl bootstrap gui/${uid} ${home}/Library/LaunchAgents/ai.openclaw.gateway.plist'
+      timeout_ms: 10000
+      danger: confirm
+    start:
+      cmd: 'launchctl kickstart -k gui/${uid}/ai.openclaw.gateway'
+      timeout_ms: 15000
+      precondition: 'supervised == true'
+      fallback_action: bootstrap
+    stop:
+      cmd: 'launchctl kill TERM gui/${uid}/ai.openclaw.gateway'
+      timeout_ms: 10000
+      danger: confirm
+    restart:
+      cmd: 'launchctl kickstart -k -p gui/${uid}/ai.openclaw.gateway'
+      timeout_ms: 20000
+    status:
+      cmd: 'launchctl print gui/${uid}/ai.openclaw.gateway'
+      timeout_ms: 5000
+
+health:
+  l1: { type: tcp, port: 18789, timeout_ms: 1500 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:18789/health'
+    expect_status: 200
+    timeout_ms: 5000
+  l3:
+    - id: plugin-integrity
+      desc: '插件损坏时端口照常监听，但拒绝 report ready'
+      type: script
+      script: probes/openclaw-plugins.mjs
+      assert: 'healthy == true'
+      timeout_ms: 20000
+      interval_ms: 300000
+      cost: free
+      note: |
+        实测：插件校验失败 → 服务活着、/health 返回 200，但任何 agent turn 都会被拒。
+        这是典型假活。
+    - id: turn-latency
+      desc: '本机能跑出 280s 的 agent turn（直连同样请求只要 6.1s）'
+      type: script
+      script: probes/openclaw-turn-latency.mjs
+      assert: 'ms < 60000'
+      timeout_ms: 120000
+      interval_ms: 900000
+      cost: cheap
+      note: |
+        延迟异常几乎总是路由问题（走了错误的 provider / 被代理绕路），
+        而不是模型本身慢。直连 6.1s vs 网关 280s = 46 倍差距。
+
+config:
+  files:
+    - '${home}/openclaw.json'
+    - '${home}/exec-approvals.json'
+  plist: ['~/Library/LaunchAgents/ai.openclaw.gateway.plist']
+  readonly: false
+
+logs:
+  - kind: file
+    path: '${home}/logs/gateway.err.log'
+    label: 'gateway.err'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+  - kind: file
+    path: '${home}/logs/gateway-restart.log'
+    label: 'restart'
+    rotate: { max_size: '20MB', keep: 3, strategy: copytruncate }
+    ignore_patterns: ['SIGTERM received', 'graceful shutdown']
+
+depends_on: [omniroute, ollama, proxy]
+provides: [agent-api]
+
+playbooks:
+  - openclaw-version-skew
+  - openclaw-plugin-corrupt
+  - log-explosion
+
+danger:
+  stop_requires_confirm: true

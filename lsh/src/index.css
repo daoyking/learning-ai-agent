@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: #0b0f14;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC',
+      'Helvetica Neue', sans-serif;
+    font-size: 13px;
+  }
+
+  /* 细滚动条，深色面板里不要突兀的白色滑道 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #232d3b;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-ink-700 bg-ink-800 p-3 transition-colors;
+  }
+  .card:hover {
+    @apply border-ink-600 bg-[#161d27];
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium;
+  }
+}

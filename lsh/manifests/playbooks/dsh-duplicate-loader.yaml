@@ -1,0 +1,78 @@
+schema: lsh.playbook/v1
+id: dsh-duplicate-loader
+title: 插件 loader entry 冲突
+service: dsh
+severity: warn
+category: plugin
+symptom: |
+  dsh 启动或加载插件时报 "duplicate loader entry id"。
+  进程活着、端口在，但相关插件功能残缺。
+
+trigger:
+  any_of:
+    - log_match:
+        source: dsh/stderr
+        pattern: 'duplicate loader entry id'
+        window: 30m
+        count: 1
+    - probe: dsh.loader-integrity
+      when: 'conflicts > 0'
+  cooldown_ms: 900000
+
+diagnose:
+  - id: find-duplicates
+    title: 找出冲突的 entry id 与来源 bundle
+    exec:
+      cmd: |
+        grep -rn "duplicate loader entry" /tmp/dsh-web-*.log 2>/dev/null | tail -5
+        echo "--- 已安装插件 ---"
+        ls -1 ~/.deepseek-harness/profiles/*/node_modules/@*/ 2>/dev/null | head -20
+      timeout_ms: 20000
+    capture: dup_lines
+  - id: plugin-dirs
+    title: 列出插件目录
+    exec:
+      cmd: "ls -1 ~/.deepseek-harness/profiles/ 2>/dev/null; echo '---'; ls -1 ~/.dsh/profiles 2>/dev/null"
+      timeout_ms: 10000
+    capture: profiles
+    optional: true
+
+conclude:
+  - when: "contains(dup_lines, 'duplicate loader entry')"
+    root_cause: |
+      两个插件（或同一插件的多个版本）声明了同一个 loader entry id。
+      dsh 的 loader 要求 entry id 全局唯一，冲突时后者加载失败，
+      但不会中断启动 —— 表现为"某个功能突然没反应"。
+    confidence: high
+    evidence:
+      - "日志：${dup_lines}"
+      - "配置目录：${profiles}"
+    recommended_fix: upgrade-plugin
+
+fix:
+  mode: manual
+  confirm: false
+  backup: []
+  steps:
+    - id: upgrade-plugin
+      title: 升级或卸载冲突插件
+      type: manual
+      instruction: |
+        ① 从日志里读出冲突的 entry id 和 bundle 名
+        ② 升级对应插件到最新版（作者通常已经改名或修掉冲突）：
+             dsh plugins upgrade <name>
+        ③ 若仍冲突，卸载其中一个：
+             dsh plugins uninstall <name>
+        ④ 重启 dsh web（本客户端的 pty supervisor 会自动分配 TTY）
+
+verify:
+  probe: dsh.loader-integrity
+  expect: 'conflicts == 0'
+  timeout_ms: 60000
+
+rollback: {}
+
+risk: medium
+side_effects: restart-service
+requires_sudo: false
+source: 'skills/dsh-maintenance'
