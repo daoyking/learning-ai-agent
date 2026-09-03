@@ -150,6 +150,12 @@ pub struct Action {
     pub precondition: Option<String>,
     #[serde(default)]
     pub fallback_action: Option<String>,
+    /// 进程包装方式，仅对长任务（start/restart）有意义：
+    ///   setsid = perl POSIX::setsid 脱离会话（macOS 无 setsid 二进制）
+    ///   pty    = /usr/bin/script -q 分配伪终端（dsh 这类校验 TTY 的程序）
+    /// 不写时由 supervisor 的 detach / pty 推导，见 commands::derive_wrap。
+    #[serde(default)]
+    pub wrap: Option<String>,
 }
 
 fn default_shell() -> String { "/bin/zsh -lc".into() }

@@ -311,6 +311,37 @@ pub struct FixPreview {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixStepOut {
+    pub id: String,
+    pub title: String,
+    pub kind: String,
+    pub command: String,
+    pub output: Option<String>,
+    pub exit: Option<i32>,
+    pub error: Option<String>,
+    pub skipped: bool,
+    pub skip_reason: Option<String>,
+    pub rolled_back: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifyOut {
+    pub passed: bool,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FixApplyResult {
+    pub executed: bool,
+    pub needs_confirm: bool,
+    pub rejected_sudo: bool,
+    pub mode: String,
+    pub steps: Vec<FixStepOut>,
+    pub verify: Option<VerifyOut>,
+    pub rollback_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiagnoseResult {
     pub id: String,
     pub title: String,
@@ -1375,6 +1406,387 @@ fn fix_preview(pb: &Playbook) -> Option<FixPreview> {
     })
 }
 
+// ───────────────────────────── V0.3 一键修复（assisted / auto） ─────────────────────────────
+
+type StepRun = Result<(String, String, i32), String>; // (渲染命令, 输出, 退出码)
+
+/// 执行一个修复步骤（只读诊断之外的"写"动作）。manual 步骤不执行，仅返回指引。
+fn run_fix_step(step: &FixStep, home: &str, snapshots: &mut Vec<String>) -> FixStepOut {
+    let mut out = FixStepOut {
+        id: step.id.clone(),
+        title: step.title.clone().unwrap_or_default(),
+        kind: step.kind.clone(),
+        command: String::new(),
+        output: None,
+        exit: None,
+        error: None,
+        skipped: false,
+        skip_reason: None,
+        rolled_back: false,
+    };
+
+    if step.kind == "manual" {
+        out.skipped = true;
+        out.skip_reason = Some(step.instruction.clone().unwrap_or_default());
+        return out;
+    }
+
+    // 涉及文件的步骤执行前做快照（可回滚）
+    if step.snapshot && (step.kind == "sqlite_update" || step.kind == "yaml_set" || step.kind == "file_write") {
+        if let Some(f) = &step.file {
+            let p = registry::expand(f, Some(home));
+            if let Ok(s) = snapshot_file(&p) {
+                snapshots.push(s);
+            }
+        }
+    }
+
+    let r: StepRun = match step.kind.as_str() {
+        "exec" => run_fix_exec(step, home),
+        "sqlite_update" => run_fix_sqlite(step, home),
+        "yaml_set" => run_fix_yaml_set(step, home),
+        "file_write" => run_fix_file_write(step, home),
+        "docker" => run_fix_docker(step, home),
+        "launchctl" => run_fix_launchctl(step, home),
+        other => Err(format!("不支持的修复步骤类型: {other}")),
+    };
+
+    match r {
+        Ok((cmd, output, exit)) => {
+            out.command = cmd;
+            out.output = Some(output);
+            out.exit = Some(exit);
+        }
+        Err(e) => {
+            out.error = Some(e);
+        }
+    }
+    out
+}
+
+fn run_fix_exec(step: &FixStep, home: &str) -> StepRun {
+    let cmd = registry::expand(step.cmd.as_deref().unwrap_or(""), Some(home));
+    let cwd = step
+        .cwd
+        .as_deref()
+        .map(|c| registry::expand(c, Some(home)))
+        .unwrap_or_else(|| home.to_string());
+    let (prog, base) = exec::split_shell("/bin/zsh -lc");
+    let out = exec::run_blocking(prog, &base, &cmd, &cwd, &HashMap::new(), step.timeout_ms.max(1000))
+        .map_err(|e| format!("执行失败: {e}"))?;
+    Ok((cmd, out.combined.clone(), out.code))
+}
+
+fn run_fix_sqlite(step: &FixStep, home: &str) -> StepRun {
+    let file = registry::expand(step.file.as_deref().unwrap_or(""), Some(home));
+    let sql = step.sql.clone().unwrap_or_default();
+    let file_json = serde_json::to_string(&file).map_err(|e| format!("序列化路径失败: {e}"))?;
+    let sql_json = serde_json::to_string(&sql).map_err(|e| format!("序列化 SQL 失败: {e}"))?;
+    let script = format!(
+        "const {{DatabaseSync}}=require('node:sqlite');const db=new DatabaseSync({});const info=db.prepare({}).run();console.log('__LSH_SQL_OK__'+JSON.stringify({{changes:info.changes||0}}));",
+        file_json, sql_json
+    );
+    let out = exec::run_node_argv(&script, &[], home, step.timeout_ms.max(1000))
+        .map_err(|e| format!("运行 sqlite 更新失败: {e}"))?;
+    let changes = if let Some(idx) = out.combined.find("__LSH_SQL_OK__") {
+        let js = &out.combined[idx + 14..];
+        serde_json::from_str::<Value>(js.trim())
+            .ok()
+            .and_then(|v| v.get("changes").and_then(|c| c.as_i64()))
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    Ok((format!("SQL: {sql}"), format!("已更新 {changes} 行"), out.code))
+}
+
+fn run_fix_yaml_set(step: &FixStep, home: &str) -> StepRun {
+    let file = registry::expand(step.file.as_deref().unwrap_or(""), Some(home));
+    let path = step.path.clone().unwrap_or_default();
+    let content =
+        std::fs::read_to_string(&file).map_err(|e| format!("读取 {} 失败: {e}", file))?;
+    let mut doc: serde_yaml::Value =
+        serde_yaml::from_str(&content).map_err(|e| format!("解析 YAML 失败: {e}"))?;
+    set_yaml_path(&mut doc, &path, step.value.clone().unwrap_or(serde_yaml::Value::Null));
+    let updated =
+        serde_yaml::to_string(&doc).map_err(|e| format!("序列化 YAML 失败: {e}"))?;
+    std::fs::write(&file, updated).map_err(|e| format!("写回 {} 失败: {e}", file))?;
+    Ok((format!("设置 {path}"), format!("已写入 {file}"), 0))
+}
+
+fn run_fix_file_write(step: &FixStep, home: &str) -> StepRun {
+    let file = registry::expand(step.file.as_deref().unwrap_or(""), Some(home));
+    let content = yaml_value_to_string(&step.value);
+    std::fs::write(&file, content.as_bytes()).map_err(|e| format!("写入 {} 失败: {e}", file))?;
+    Ok((format!("写入 {file}"), "已写入".into(), 0))
+}
+
+fn run_fix_docker(step: &FixStep, home: &str) -> StepRun {
+    let action = step.action.clone().unwrap_or_default();
+    let container = step.container.clone().unwrap_or_default();
+    let cmd = format!("docker {action} {container}");
+    let (prog, base) = exec::split_shell("/bin/zsh -lc");
+    let out = exec::run_blocking(prog, &base, &cmd, home, &HashMap::new(), step.timeout_ms.max(1000))
+        .map_err(|e| format!("执行失败: {e}"))?;
+    Ok((cmd, out.combined.clone(), out.code))
+}
+
+fn run_fix_launchctl(step: &FixStep, home: &str) -> StepRun {
+    let action = step.action.clone().unwrap_or_default();
+    let label = step.label.clone().unwrap_or_default();
+    let full = if action == "kickstart" {
+        format!("launchctl kickstart -k gui/{}/{}", current_uid(), label)
+    } else {
+        format!("launchctl {action} {label}")
+    };
+    let (prog, base) = exec::split_shell("/bin/zsh -lc");
+    let out = exec::run_blocking(prog, &base, &full, home, &HashMap::new(), step.timeout_ms.max(1000))
+        .map_err(|e| format!("执行失败: {e}"))?;
+    Ok((full, out.combined.clone(), out.code))
+}
+
+fn current_uid() -> String {
+    std::process::Command::new("id")
+        .arg("-u")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
+/// 沿点分路径设置 YAML 叶子值，中间节点缺失则补 Mapping。
+fn set_yaml_path(doc: &mut serde_yaml::Value, path: &str, val: serde_yaml::Value) {
+    let parts: Vec<&str> = path.split('.').collect();
+    if parts.is_empty() {
+        return;
+    }
+    let mut cur = doc;
+    for p in &parts[..parts.len() - 1] {
+        if !cur.is_mapping() {
+            *cur = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
+        }
+        if let serde_yaml::Value::Mapping(m) = cur {
+            let key = serde_yaml::Value::String((*p).to_string());
+            if !m.contains_key(&key) {
+                m.insert(key.clone(), serde_yaml::Value::Null);
+            }
+            cur = m.get_mut(&key).unwrap();
+        } else {
+            return;
+        }
+    }
+    *cur = val;
+}
+
+fn snap_suffix() -> String {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos().to_string())
+        .unwrap_or_else(|_| "0".into())
+}
+
+fn snapshot_file(path: &str) -> Result<String, String> {
+    if !std::path::Path::new(path).exists() {
+        return Err(format!("快照目标不存在: {path}"));
+    }
+    let snap = format!("{path}.lsh-bak.{}", snap_suffix());
+    std::fs::copy(path, &snap).map_err(|e| format!("快照失败: {e}"))?;
+    Ok(snap)
+}
+
+fn restore_snapshot(snap: &str) -> Result<(), String> {
+    let orig = snap.rsplit_once(".lsh-bak.").map(|(o, _)| o).unwrap_or(snap);
+    std::fs::copy(snap, orig).map_err(|e| format!("恢复快照失败: {e}"))?;
+    Ok(())
+}
+
+fn run_verify(pb: &Playbook, home: &str) -> Option<VerifyOut> {
+    let v = pb.verify.as_ref()?;
+    if let Some(probe) = &v.probe {
+        if let Some((svc, p)) = probe.split_once('.') {
+            return match run_probe(svc, p) {
+                Ok(obj) => {
+                    let mut vars = HashMap::new();
+                    for (k, val) in flatten_top(&obj) {
+                        vars.insert(k, val);
+                    }
+                    if let Some(expect) = &v.expect {
+                        let ok = eval_expr(expect, &vars).map(|r| truthy(&r)).unwrap_or(false);
+                        Some(VerifyOut {
+                            passed: ok,
+                            detail: if ok {
+                                "探针复检通过".into()
+                            } else {
+                                format!("复检表达式未满足: {expect}")
+                            },
+                        })
+                    } else {
+                        Some(VerifyOut { passed: true, detail: "探针已复跑".into() })
+                    }
+                }
+                Err(e) => Some(VerifyOut { passed: false, detail: format!("复检探针失败: {e}") }),
+            };
+        }
+        return Some(VerifyOut { passed: false, detail: "verify.probe 格式应为 service.probeId".into() });
+    }
+    if let Some(cmd) = &v.cmd {
+        let expanded = registry::expand(cmd, Some(home));
+        let (prog, base) = exec::split_shell("/bin/zsh -lc");
+        return match exec::run_blocking(prog, &base, &expanded, home, &HashMap::new(), v.timeout_ms) {
+            Ok(out) => Some(VerifyOut { passed: out.code == 0, detail: out.combined.clone() }),
+            Err(e) => Some(VerifyOut { passed: false, detail: format!("复检命令失败: {e}") }),
+        };
+    }
+    None
+}
+
+/// V0.3 一键修复：诊断之后执行 fix 步骤，带快照回滚与复检。
+/// confirmed=false 且 fix.confirm=true 时只返回 needs_confirm，不执行任何写动作。
+pub fn apply_fix(pb: &Playbook, confirmed: bool) -> Result<FixApplyResult, String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let fix = match &pb.fix {
+        Some(f) => f,
+        None => return Err("该剧本没有定义修复步骤".into()),
+    };
+
+    // 模式门：V0.2 强制只读，V0.3 仅执行 assisted / auto
+    if fix.mode != "assisted" && fix.mode != "auto" {
+        return Ok(FixApplyResult {
+            executed: false,
+            needs_confirm: false,
+            rejected_sudo: false,
+            mode: fix.mode.clone(),
+            steps: Vec::new(),
+            verify: None,
+            rollback_note: Some("本剧本 fix.mode 为 manual，V0.3 仅展示命令、不代执行。".into()),
+        });
+    }
+
+    // sudo 门：客户端绝不代执行需要 sudo 的步骤
+    if pb.requires_sudo {
+        return Ok(FixApplyResult {
+            executed: false,
+            needs_confirm: false,
+            rejected_sudo: true,
+            mode: fix.mode.clone(),
+            steps: Vec::new(),
+            verify: None,
+            rollback_note: Some("requires_sudo=true，客户端不代执行，请按预览命令手动操作。".into()),
+        });
+    }
+
+    // 确认门：fix.confirm=true 时必须 confirmed
+    if fix.confirm && !confirmed {
+        return Ok(FixApplyResult {
+            executed: false,
+            needs_confirm: true,
+            rejected_sudo: false,
+            mode: fix.mode.clone(),
+            steps: Vec::new(),
+            verify: None,
+            rollback_note: None,
+        });
+    }
+
+    // 先备份 fix.backup 列出的文件
+    let mut backup_snaps: Vec<String> = Vec::new();
+    for b in &fix.backup {
+        let p = registry::expand(b, Some(&home));
+        if let Ok(s) = snapshot_file(&p) {
+            backup_snaps.push(s);
+        }
+    }
+
+    let mut steps_out: Vec<FixStepOut> = Vec::new();
+    let mut snapshots: Vec<String> = Vec::new();
+    let mut failed = false;
+    let mut failure_step: Option<String> = None;
+
+    for step in &fix.steps {
+        let out = run_fix_step(step, &home, &mut snapshots);
+        let is_err = out.error.is_some();
+        let skipped = out.skipped;
+        steps_out.push(out);
+        if is_err && !skipped {
+            failed = true;
+            failure_step = Some(step.id.clone());
+            break;
+        }
+    }
+
+    let verify = if !failed { run_verify(pb, &home) } else { None };
+
+    // 复检不通过同样要回滚。
+    //
+    // 步骤全跑成功但复检没过，意味着"改动做完了，问题没解决"——
+    // 服务会停在一个改过却更糟的中间态，比修之前还难排查。
+    // 所以回滚的触发条件是「步骤失败 OR 复检失败」，而不只是前者。
+    let verify_failed = matches!(&verify, Some(v) if !v.passed);
+
+    let rollback_note = if failed {
+        Some(rollback_all(
+            pb,
+            &home,
+            &backup_snaps,
+            &snapshots,
+            &format!("步骤 {} 执行失败", failure_step.clone().unwrap_or_default()),
+        ))
+    } else if verify_failed {
+        Some(rollback_all(pb, &home, &backup_snaps, &snapshots, "复检未通过"))
+    } else {
+        None
+    };
+
+    Ok(FixApplyResult {
+        executed: !failed,
+        needs_confirm: false,
+        rejected_sudo: false,
+        mode: fix.mode.clone(),
+        steps: steps_out,
+        verify,
+        rollback_note,
+    })
+}
+
+/// 把改动撤回：先还原所有快照，再执行剧本自己声明的 rollback 步骤。
+/// 返回给用户看的一句话说明——回滚做了什么、原文件在哪，必须说得清。
+fn rollback_all(
+    pb: &Playbook,
+    home: &str,
+    backup_snaps: &[String],
+    step_snaps: &[String],
+    reason: &str,
+) -> String {
+    let mut restored = 0usize;
+    for snap in backup_snaps.iter().chain(step_snaps.iter()) {
+        if restore_snapshot(snap).is_ok() {
+            restored += 1;
+        }
+    }
+
+    let mut detail = vec![format!("{reason}，已还原 {restored} 个快照")];
+
+    if let Some(rb) = &pb.rollback {
+        for rs in &rb.steps {
+            let mut dummy = Vec::new();
+            let r = run_fix_step(rs, home, &mut dummy);
+            detail.push(format!(
+                "[rollback] {}: {}",
+                rs.id,
+                r.error
+                    .clone()
+                    .unwrap_or_else(|| r.output.clone().unwrap_or_default())
+            ));
+        }
+        if let Some(note) = &rb.note {
+            detail.push(note.clone());
+        }
+    }
+
+    detail.join("；")
+}
+
 // ───────────────────────────── 测试 ─────────────────────────────
 
 #[cfg(test)]
@@ -1472,6 +1884,135 @@ mod tests {
         assert!(
             ids.contains(&"searxng-no-result"),
             "应匹配 searxng 本地化剧本，实际 {ids:?}"
+        );
+    }
+
+    #[test]
+    fn apply_fix_requires_confirm_before_executing() {
+        let pb = get_playbook("omniroute-ghost-proxy").expect("load");
+        let r = apply_fix(&pb, false).expect("apply");
+        assert!(!r.executed, "confirmed=false 不应执行任何写动作");
+        assert!(r.needs_confirm, "assisted+confirm 应在 confirmed=false 时要求确认");
+    }
+
+    #[test]
+    fn apply_fix_manual_mode_never_executes() {
+        let pb = get_playbook("chromadb-empty-store").expect("load"); // mode: manual
+        let r = apply_fix(&pb, true).expect("apply");
+        assert!(!r.executed, "manual 模式即使 confirmed=true 也不执行");
+    }
+
+    #[test]
+    fn apply_fix_sudo_is_rejected() {
+        let yaml = r#"
+schema: lsh.playbook/v1
+id: test-sudo
+title: t
+trigger:
+  any_of: []
+diagnose:
+  - id: d
+    title: d
+conclude:
+  - when: "true"
+    root_cause: r
+fix:
+  mode: assisted
+  confirm: false
+  steps: []
+requires_sudo: true
+"#;
+        let pb: Playbook = serde_yaml::from_str(yaml).expect("parse");
+        let r = apply_fix(&pb, true).expect("apply");
+        assert!(r.rejected_sudo, "requires_sudo=true 必须被拒绝");
+        assert!(!r.executed);
+    }
+
+    /// "步骤全成功但复检没过"必须回滚。
+    ///
+    /// 这是最容易被漏掉的一种坏结果：命令都跑通了，问题却没解决，
+    /// 服务停在一个改过却更糟的中间态。不回滚的话，用户手上只剩一句
+    /// "复检未通过"，却不知道系统已经被改成什么样了。
+    #[test]
+    fn verify_failure_triggers_rollback() {
+        let yaml = r#"
+schema: "lsh/playbook/v1"
+id: lsh-test-verify-fail
+title: 复检失败回滚测试
+trigger:
+  any_of: []
+diagnose:
+  - id: d
+    title: d
+    exec:
+      cmd: "echo ok"
+conclude:
+  - when: "true"
+    root_cause: 测试用
+fix:
+  mode: assisted
+  confirm: false
+  steps:
+    - id: s1
+      title: 做一处无害改动
+      type: exec
+      cmd: "echo changed"
+      snapshot: false
+verify:
+  cmd: "false"
+  timeout_ms: 5000
+"#;
+        let pb: Playbook = serde_yaml::from_str(yaml).expect("parse");
+        let r = apply_fix(&pb, true).expect("apply");
+
+        assert!(
+            !r.verify.as_ref().map(|v| v.passed).unwrap_or(true),
+            "verify 用 false 命令，必然不通过"
+        );
+        let note = r.rollback_note.clone().unwrap_or_default();
+        assert!(
+            note.contains("复检未通过"),
+            "复检失败必须触发回滚并说明原因，实际 rollback_note: {note:?}"
+        );
+    }
+
+    #[test]
+    fn verify_success_does_not_roll_back() {
+        let yaml = r#"
+schema: "lsh/playbook/v1"
+id: lsh-test-verify-ok
+title: 复检通过测试
+trigger:
+  any_of: []
+diagnose:
+  - id: d
+    title: d
+    exec:
+      cmd: "echo ok"
+conclude:
+  - when: "true"
+    root_cause: 测试用
+fix:
+  mode: assisted
+  confirm: false
+  steps:
+    - id: s1
+      title: 做一处无害改动
+      type: exec
+      cmd: "echo changed"
+      snapshot: false
+verify:
+  cmd: "true"
+  timeout_ms: 5000
+"#;
+        let pb: Playbook = serde_yaml::from_str(yaml).expect("parse");
+        let r = apply_fix(&pb, true).expect("apply");
+
+        assert!(r.verify.as_ref().map(|v| v.passed).unwrap_or(false));
+        assert!(
+            r.rollback_note.is_none(),
+            "复检通过就不该回滚，实际: {:?}",
+            r.rollback_note
         );
     }
 }

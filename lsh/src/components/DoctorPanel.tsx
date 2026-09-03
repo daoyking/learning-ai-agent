@@ -20,10 +20,10 @@ export function DoctorPanel() {
     try {
       const result = await runDoctor()
       setChecks(result)
-      // 把整体结论同步到托盘 tooltip，常驻后台时一眼可见
+      // 把整体结论同步到托盘：tooltip 文字 + 图标变色（ok/warn/fail 三色）
       const summary = result.find((c) => c.id === 'summary')
       if (summary) {
-        await updateTrayStatus(`LSH · ${summary.detail}`)
+        await updateTrayStatus(`LSH · ${summary.detail}`, summary.status)
       }
     } catch (e) {
       setError(String(e))

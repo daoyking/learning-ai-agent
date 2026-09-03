@@ -28,6 +28,7 @@ pub fn run() {
             commands::tail_logs,
             commands::rotate_log,
             commands::run_doctor,
+            commands::apply_fix,
             commands::update_tray_status,
         ])
         .setup(|app| {

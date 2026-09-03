@@ -71,6 +71,12 @@ export interface ActionPreview {
   cwd: string
   rerouted: string | null
   note: string | null
+  /** none | setsid | pty —— 长任务的进程包装方式 */
+  wrap: 'none' | 'setsid' | 'pty'
+  /** 为什么这么包装（直接展示给用户，避免"我写的是 A 你跑的是 B"的困惑） */
+  wrap_reason: string | null
+  /** 包装后的完整命令回显 */
+  wrapped_command: string
 }
 
 /** run_action 返回：执行结果 / 后台 pid / 捕获的输出 */
@@ -91,6 +97,9 @@ export interface RunActionResult {
   timed_out: boolean
   note: string | null
   error: string | null
+  wrap: 'none' | 'setsid' | 'pty'
+  wrap_reason: string | null
+  wrapped_command: string
 }
 
 export interface ScanResult {
@@ -184,6 +193,34 @@ export interface DiagnoseResult {
   partial: boolean
   conclusions: ConclusionOut[]
   fix: FixPreview | null
+}
+
+export interface FixStepOut {
+  id: string
+  title: string
+  kind: string
+  command: string
+  output: string | null
+  exit: number | null
+  error: string | null
+  skipped: boolean
+  skip_reason: string | null
+  rolled_back: boolean
+}
+
+export interface VerifyOut {
+  passed: boolean
+  detail: string
+}
+
+export interface FixApplyResult {
+  executed: boolean
+  needs_confirm: boolean
+  rejected_sudo: boolean
+  mode: string
+  steps: FixStepOut[]
+  verify: VerifyOut | null
+  rollback_note: string | null
 }
 
 export interface ProbeRun {

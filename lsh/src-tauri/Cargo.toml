@@ -17,7 +17,8 @@ tauri-build = { version = "2", features = [] }
 # V0.1 能力层保持精简：只做进程/端口扫描与 manifest 加载。
 # pty 走 macOS 自带 /usr/bin/script，不引入 portable-pty。
 # sqlite / 事件流留到 V0.2。
-tauri = { version = "2", features = ["tray-icon"] }
+# tray-icon：菜单栏常驻；image-png：动态切换托盘图标（from_bytes 解码 PNG）
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

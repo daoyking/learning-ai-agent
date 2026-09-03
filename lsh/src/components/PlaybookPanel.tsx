@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
+  applyFix,
   diagnosePlaybook,
   listPlaybooks,
   matchPlaybooks,
@@ -8,6 +9,7 @@ import {
 import type {
   ConclusionOut,
   DiagnoseResult,
+  FixApplyResult,
   FixPreview,
   MatchedPlaybook,
   PlaybookSummary,
@@ -113,10 +115,10 @@ export function PlaybookPanel() {
       )}
 
       <div className="mx-5 mt-3 rounded border border-status-degraded/30 bg-status-degraded/[0.07] px-3 py-2 text-[11px] leading-relaxed text-slate-400">
-        <b className="text-status-degraded">V0.2 诊断台（只读）。</b>
+        <b className="text-status-degraded">诊断台。</b>
         点「运行探针并匹配」：先跑各服务的 L3 语义探针，再用白名单表达式引擎评估触发器。
-        命中的剧本可点开做<b>只读诊断</b>——采集证据链、推导根因，并给出修复命令
-        （manual 模式，客户端不代执行写操作；assisted/auto 在 V0.3）。
+        命中的剧本可点开做<b>只读诊断</b>——采集证据链、推导根因。
+        assisted/auto 剧本可直接<b>一键修复</b>（带快照回滚 + 执行后复检）；manual/sudo 仅展示命令。
       </div>
 
       <main className="flex-1 overflow-y-auto px-5 py-4">
@@ -284,9 +286,9 @@ function DiagnoseView({
         )}
       </Section>
 
-      {/* 修复命令（manual，V0.2 不给执行） */}
+      {/* 修复（V0.3：assisted/auto 可一键执行；manual 仅展示） */}
       {result.fix && result.fix.steps.length > 0 && (
-        <FixSection fix={result.fix} />
+        <FixRunner fix={result.fix} playbookId={result.id} />
       )}
     </div>
   )
@@ -333,6 +335,155 @@ function ConclusionCard({ c }: { c: ConclusionOut }) {
   )
 }
 
+const MODE_LABEL: Record<string, string> = {
+  manual: '手动（只给命令）',
+  assisted: '辅助（可一键执行）',
+  auto: '自动',
+}
+
+/**
+ * 修复执行器。
+ *
+ * 三道闸门，任何一道不满足就不代执行 —— 这是"一键修复"能让人放心的前提：
+ *   1. mode=manual      → V0.2 默认档，只展示命令，用户自己在终端跑
+ *   2. requires_sudo    → 提权动作一律不代执行（同启停的安全红线）
+ *   3. needs_confirm    → 后端要求确认时先回 needs_confirm，由用户点头再跑
+ */
+function FixRunner({ fix, playbookId }: { fix: FixPreview; playbookId: string }) {
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<FixApplyResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = useCallback(async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      setResult(await applyFix(playbookId, true))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }, [playbookId])
+
+  const blocked =
+    fix.mode === 'manual'
+      ? '当前为手动模式：请在终端自行执行上面的命令。客户端不做代执行 —— 修复动作会改文件或重启服务，先让你看清每一步。'
+      : fix.requires_sudo
+        ? '该修复需要提权，客户端不代执行。请在终端手动运行上面的命令。'
+        : null
+
+  return (
+    <>
+      <FixSection fix={fix} />
+
+      <Section title="执行修复">
+        {blocked ? (
+          <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-300">
+            {blocked}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={run}
+              disabled={busy}
+              className="rounded bg-emerald-600 px-3 py-1 text-[11px] text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
+            >
+              {busy ? '执行中…' : '一键修复'}
+            </button>
+            <span className="text-[10px] text-slate-500">
+              {MODE_LABEL[fix.mode] ?? fix.mode}
+              {fix.confirm && ' · 需确认'}
+            </span>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-2 rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">
+            {error}
+          </div>
+        )}
+
+        {result && <FixResultView result={result} />}
+      </Section>
+    </>
+  )
+}
+
+function FixResultView({ result }: { result: FixApplyResult }) {
+  if (result.rejected_sudo) {
+    return (
+      <div className="mt-2 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">
+        已拒绝：该修复需要提权，客户端不代执行。
+      </div>
+    )
+  }
+  if (result.needs_confirm) {
+    return (
+      <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-300">
+        该剧本要求确认后才执行，未执行任何写操作。
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      {result.steps.map((s) => (
+        <div key={s.id} className="rounded border border-ink-700 bg-ink-900 p-2">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-[11px] font-medium text-slate-300">{s.title}</span>
+            {s.skipped ? (
+              <span className="rounded bg-slate-500/20 px-1 text-[9px] text-slate-400">
+                已跳过{s.skip_reason ? `：${s.skip_reason}` : ''}
+              </span>
+            ) : s.error ? (
+              <span className="rounded bg-rose-500/20 px-1 text-[9px] text-rose-300">
+                失败 exit={s.exit ?? '?'}
+              </span>
+            ) : (
+              <span className="rounded bg-emerald-500/20 px-1 text-[9px] text-emerald-300">
+                完成 exit={s.exit ?? 0}
+              </span>
+            )}
+            {s.rolled_back && (
+              <span className="rounded bg-sky-500/20 px-1 text-[9px] text-sky-300">已回滚</span>
+            )}
+          </div>
+          <pre className="whitespace-pre-wrap rounded bg-ink-950 p-1.5 font-mono text-[10px] text-slate-500">
+            {s.command}
+          </pre>
+          {s.output && (
+            <pre className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-ink-950 p-1.5 font-mono text-[10px] text-slate-300">
+              {s.output}
+            </pre>
+          )}
+          {s.error && (
+            <div className="mt-1 text-[10px] text-rose-300">{s.error}</div>
+          )}
+        </div>
+      ))}
+
+      {result.verify && (
+        <div
+          className={`rounded border px-2 py-1.5 text-[11px] ${
+            result.verify.passed
+              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+              : 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+          }`}
+        >
+          复检{result.verify.passed ? '通过' : '未通过'}：{result.verify.detail}
+        </div>
+      )}
+
+      {result.rollback_note && (
+        <div className="rounded border border-ink-700 bg-ink-900 px-2 py-1.5 text-[10px] text-slate-400">
+          回滚方式：{result.rollback_note}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FixSection({ fix }: { fix: FixPreview }) {
   const riskBadge =
     fix.risk === 'high'
@@ -341,7 +492,7 @@ function FixSection({ fix }: { fix: FixPreview }) {
         ? 'bg-amber-500/20 text-amber-300'
         : 'bg-emerald-500/20 text-emerald-300'
   return (
-    <Section title="建议的修复命令（manual · 客户端不代执行）">
+    <Section title="修复步骤预览">
       <div className="mb-2 flex items-center gap-2 text-[10px]">
         <span className={`rounded px-1.5 py-0.5 ${riskBadge}`}>风险 {fix.risk}</span>
         <span className="rounded bg-ink-700 px-1.5 py-0.5 text-slate-400">副作用 {fix.side_effects}</span>

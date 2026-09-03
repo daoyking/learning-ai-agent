@@ -255,6 +255,11 @@
         "fallback_action": {
           "type": "string",
           "description": "precondition 不满足时改执行的动作名（指向同一 actions 下的另一个 key）。"
+        },
+        "wrap": {
+          "type": "string",
+          "enum": ["setsid", "pty"],
+          "description": "长任务（start/restart）的进程包装方式。setsid=用 perl POSIX::setsid 脱离会话（macOS 无 setsid 二进制）；pty=用 /usr/bin/script -q 分配伪终端（程序校验 isatty 时必需）。省略时由 supervisor.detach / supervisor.kind 自动推导；命令经 launchctl 时一律不包装。"
         }
       }
     },

@@ -39,6 +39,13 @@ const DANGER_BADGE: Record<string, { label: string; cls: string }> = {
   sudo: { label: '需提权', cls: 'bg-rose-500/15 text-rose-300' },
 }
 
+/** 长任务的进程包装方式 —— 决定服务能否在客户端退出后继续活着 */
+const WRAP_LABEL: Record<string, string> = {
+  setsid: 'setsid（脱离会话）',
+  pty: 'pty（伪终端）',
+  none: '不包装',
+}
+
 interface ManageState {
   card: Card
   preview: ActionPreview | null
@@ -393,6 +400,21 @@ function ManageModal({
               <div className="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-300">
                 前置条件不满足：{preview.rerouted}
                 （已改用 {preview.effective_action} 代替原动作）
+              </div>
+            )}
+
+            {preview.wrap !== 'none' && (
+              <div className="mb-2 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1.5 text-[11px] text-sky-300">
+                <div className="mb-0.5">
+                  进程包装：
+                  <span className="font-mono">{WRAP_LABEL[preview.wrap] ?? preview.wrap}</span>
+                  {preview.wrap_reason && (
+                    <span className="text-sky-400/80"> — {preview.wrap_reason}</span>
+                  )}
+                </div>
+                <div className="font-mono text-[10px] text-slate-500">
+                  实际执行：{preview.wrapped_command}
+                </div>
               </div>
             )}
 

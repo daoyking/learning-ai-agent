@@ -74,6 +74,12 @@ pub struct ActionPreview {
     pub cwd: String,
     pub rerouted: Option<String>,
     pub note: Option<String>,
+    /// none | setsid | pty
+    pub wrap: String,
+    /// 为什么要包这一层（UI 直接展示，避免"我明明写的是 A，你跑的却是 B"的困惑）
+    pub wrap_reason: Option<String>,
+    /// 包装后的完整 argv 回显，便于核对
+    pub wrapped_command: String,
 }
 
 /// 真正执行一个动作后的结果。
@@ -98,6 +104,10 @@ pub struct RunActionResult {
     pub timed_out: bool,
     pub note: Option<String>,
     pub error: Option<String>,
+    /// none | setsid | pty
+    pub wrap: String,
+    pub wrap_reason: Option<String>,
+    pub wrapped_command: String,
 }
 
 /// 扫描本机端口，与 manifest 合并出服务卡片。
@@ -148,6 +158,9 @@ struct ResolvedAction {
     cwd: String,
     env: HashMap<String, String>,
     rerouted: Option<String>,
+    wrap: exec::Wrap,
+    /// 给 UI 看的一句话解释：为什么要这么包装。
+    wrap_reason: Option<String>,
 }
 
 fn resolve_action(service_id: &str, action: &str) -> Result<ResolvedAction, String> {
@@ -197,6 +210,8 @@ fn resolve_action(service_id: &str, action: &str) -> Result<ResolvedAction, Stri
         env.insert(k.clone(), registry::expand(v, Some(&home)));
     }
 
+    let (wrap, wrap_reason) = derive_wrap(m, &effective, &act);
+
     Ok(ResolvedAction {
         effective,
         act,
@@ -204,7 +219,89 @@ fn resolve_action(service_id: &str, action: &str) -> Result<ResolvedAction, Stri
         cwd,
         env,
         rerouted,
+        wrap,
+        wrap_reason,
     })
+}
+
+/// 决定长任务要不要包一层、包哪一层。
+///
+/// 优先级：action 显式声明 > supervisor 推导。
+///
+/// 最关键的一条判据：**走 launchctl 的 action 一律不包 pty**。
+/// dsh 的 plist 自己就写了 `script -q`，由 launchd 托管后 TTY 问题已经被
+/// 系统解决；客户端再包一层反而会抢走终端、让 launchctl 拿不到干净的输出。
+fn derive_wrap(
+    m: &ServiceManifest,
+    action_name: &str,
+    act: &Action,
+) -> (exec::Wrap, Option<String>) {
+    let cmd = act.cmd.clone().unwrap_or_default();
+    let via_launchd = cmd.contains("launchctl");
+
+    // 最本质的判据：命令既然交给 launchd，TTY 与守护就都由 launchd/plist 负责。
+    // 判据放在动作名之前，是因为 start 可能被 precondition 改道成 bootstrap
+    // （dsh 现在就是这样：job 未加载 → 先 bootstrap 再 kickstart）——
+    // 改道后动作名变了，但"走 launchctl"这件事没变。
+    if via_launchd {
+        return (
+            exec::Wrap::None,
+            if m.supervisor.kind == "pty" {
+                Some("经 launchctl 托管，TTY 由 plist 自带的 script -q 负责，不重复包装".into())
+            } else {
+                None
+            },
+        );
+    }
+
+    // 短命令（stop/status）跑完就退，不存在"被会话回收"问题。
+    if !matches!(action_name, "start" | "restart") {
+        return (exec::Wrap::None, None);
+    }
+
+    if let Some(w) = act.wrap.as_deref() {
+        return match w {
+            "setsid" => (
+                exec::Wrap::Setsid,
+                Some("manifest 声明 setsid：脱离会话，客户端退出不回收".into()),
+            ),
+            "pty" => match &m.supervisor.pty {
+                Some(p) => (
+                    exec::Wrap::Pty {
+                        log: registry::expand(p.log.as_deref().unwrap_or("/dev/null"), None),
+                        rows: p.rows,
+                        cols: p.cols,
+                    },
+                    Some("manifest 声明 pty：程序校验 isatty()，需伪终端".into()),
+                ),
+                None => (exec::Wrap::None, None),
+            },
+            _ => (exec::Wrap::None, None),
+        };
+    }
+
+    // supervisor 级推导
+    if m.supervisor.detach.as_deref() == Some("setsid") {
+        return (
+            exec::Wrap::Setsid,
+            Some("supervisor.detach=setsid：常驻脚本需脱离客户端会话".into()),
+        );
+    }
+
+    if m.supervisor.kind == "pty" {
+        if let Some(p) = &m.supervisor.pty {
+            return (
+                exec::Wrap::Pty {
+                    log: registry::expand(p.log.as_deref().unwrap_or("/dev/null"), None),
+                    rows: p.rows,
+                    cols: p.cols,
+                },
+                Some("supervisor.kind=pty：程序校验 isatty()，需自建伪终端".into()),
+            );
+        }
+    }
+
+    (exec::Wrap::None, None)
 }
 
 /// danger 判定：sudo 字段优先级最高（绝不代执行），其次看 action.danger。
@@ -213,6 +310,33 @@ fn effective_danger(act: &Action) -> String {
         return "sudo".into();
     }
     act.danger.clone().unwrap_or_else(|| "none".into())
+}
+
+fn wrap_view(w: &exec::Wrap) -> String {
+    match w {
+        exec::Wrap::None => "none".into(),
+        exec::Wrap::Setsid => "setsid".into(),
+        exec::Wrap::Pty { .. } => "pty".into(),
+    }
+}
+
+/// 把 argv 渲染成一行可读命令。仅用于展示，真正执行走 argv 数组，
+/// 所以这里加引号只是为了好看，不承担防注入职责。
+fn render_argv(shell: &str, cmd: &str, w: &exec::Wrap) -> String {
+    let (prog, args) = exec::build_argv(shell, cmd, w);
+    let mut parts = vec![prog];
+    parts.extend(args);
+    parts
+        .iter()
+        .map(|s| {
+            if s.is_empty() || s.contains(' ') || s.contains('\'') || s.contains('"') {
+                format!("'{}'", s.replace('\'', "'\\''"))
+            } else {
+                s.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn build_card(m: &ServiceManifest, ports: &[PortEntry]) -> ServiceCard {
@@ -301,6 +425,9 @@ fn now_ms() -> u64 {
 pub fn preview_action(service_id: String, action: String) -> Result<ActionPreview, String> {
     let r = resolve_action(&service_id, &action)?;
     let danger = effective_danger(&r.act);
+    // 先算完再 move：struct literal 按字段顺序求值，
+    // command: r.cmd 一旦 move，后面就借不到 r.cmd 了。
+    let wrapped_command = render_argv(&r.act.shell, &r.cmd, &r.wrap);
     Ok(ActionPreview {
         service_id,
         action,
@@ -312,6 +439,9 @@ pub fn preview_action(service_id: String, action: String) -> Result<ActionPrevie
         cwd: r.cwd,
         rerouted: r.rerouted,
         note: r.act.note,
+        wrap: wrap_view(&r.wrap),
+        wrap_reason: r.wrap_reason,
+        wrapped_command,
     })
 }
 
@@ -328,153 +458,100 @@ pub fn run_action(
     action: String,
     confirmed: bool,
 ) -> Result<RunActionResult, String> {
-    let r = resolve_action(&service_id, &action)?;
+    let mut r = resolve_action(&service_id, &action)?;
     let danger = effective_danger(&r.act);
 
+    // 包装视图必须在这里算好：下面 r 会被逐字段 move，届时再借用就晚了。
+    let wrap_str = wrap_view(&r.wrap);
+    let wrap_reason = r.wrap_reason.clone();
+    let wrapped_command = render_argv(&r.act.shell, &r.cmd, &r.wrap);
+    let timeout_ms = r.act.timeout_ms;
+
+    // 先造一个"什么都不做"的基础结果，各分支只改自己关心的字段。
+    // 这样新增字段时只有一处要改，不会漏掉某个分支。
+    let mut out = RunActionResult {
+        service_id,
+        action: action.clone(),
+        effective_action: r.effective.clone(),
+        executed: false,
+        danger: danger.clone(),
+        requires_confirm: false,
+        sudo_required: false,
+        command: r.cmd.clone(),
+        cwd: r.cwd.clone(),
+        rerouted: r.rerouted.clone(),
+        output: None,
+        exit_code: None,
+        spawned_pid: None,
+        timed_out: false,
+        note: r.act.note.clone(),
+        error: None,
+        wrap: wrap_str,
+        wrap_reason,
+        wrapped_command,
+    };
+
     if danger == "sudo" {
-        return Ok(RunActionResult {
-            service_id,
-            action,
-            effective_action: r.effective.clone(),
-            executed: false,
-            danger,
-            requires_confirm: false,
-            sudo_required: true,
-            command: r.cmd,
-            cwd: r.cwd,
-            rerouted: r.rerouted,
-            output: None,
-            exit_code: None,
-            spawned_pid: None,
-            timed_out: false,
-            note: r.act.note,
-            error: Some("该动作需要提权，客户端不代执行，请在终端手动运行".into()),
-        });
+        out.sudo_required = true;
+        out.error = Some("该动作需要提权，客户端不代执行，请在终端手动运行".into());
+        return Ok(out);
     }
 
     if danger == "confirm" && !confirmed {
-        return Ok(RunActionResult {
-            service_id,
-            action,
-            effective_action: r.effective.clone(),
-            executed: false,
-            danger,
-            requires_confirm: true,
-            sudo_required: false,
-            command: r.cmd,
-            cwd: r.cwd,
-            rerouted: r.rerouted,
-            output: None,
-            exit_code: None,
-            spawned_pid: None,
-            timed_out: false,
-            note: r.act.note,
-            error: None,
-        });
+        out.requires_confirm = true;
+        return Ok(out);
     }
 
-    // shell 形如 "/bin/zsh -lc" → 拆成程序 + 参数（-l -c）
-    let parts: Vec<&str> = r.act.shell.split_whitespace().collect();
+    // shell 形如 "/bin/zsh -lc" → 拆成程序 + 参数（-l -c）。
+    // clone 成局部串再切，避免 borrow 一路借到 r 上、挡住后面修改 r.env。
+    let shell = r.act.shell.clone();
+    let parts: Vec<&str> = shell.split_whitespace().collect();
     let (prog, base_args) = parts
         .split_first()
-        .ok_or_else(|| format!("action shell 为空: {}", r.act.shell))?;
+        .ok_or_else(|| format!("action shell 为空: {shell}"))?;
 
     let is_long_running = matches!(action.as_str(), "start" | "restart");
 
     if is_long_running {
-        match exec::spawn_detached(prog, base_args, &r.cmd, &r.cwd, &r.env) {
-            Ok(pid) => Ok(RunActionResult {
-                service_id,
-                action,
-                effective_action: r.effective,
-                executed: true,
-                danger,
-                requires_confirm: false,
-                sudo_required: false,
-                command: r.cmd,
-                cwd: r.cwd,
-                rerouted: r.rerouted,
-                output: Some(format!(
+        // pty 包装的前置工作：script 不会自建目录，日志父目录不在就直接失败。
+        let pty_cfg = match &r.wrap {
+            exec::Wrap::Pty { log, rows, cols } => Some((log.clone(), *rows, *cols)),
+            _ => None,
+        };
+        if let Some((log, rows, cols)) = pty_cfg {
+            exec::ensure_parent_dir(&log)?;
+            for (k, v) in exec::pty_env(rows, cols) {
+                r.env.insert(k, v);
+            }
+        }
+
+        match exec::spawn_detached(prog, base_args, &r.cmd, &r.cwd, &r.env, &r.wrap) {
+            Ok(pid) => {
+                out.executed = true;
+                out.output = Some(format!(
                     "已在后台启动 (pid={pid})，请稍后重新扫描确认端口。"
-                )),
-                exit_code: None,
-                spawned_pid: Some(pid),
-                timed_out: false,
-                note: r.act.note,
-                error: None,
-            }),
-            Err(e) => Ok(RunActionResult {
-                service_id,
-                action,
-                effective_action: r.effective,
-                executed: false,
-                danger,
-                requires_confirm: false,
-                sudo_required: false,
-                command: r.cmd,
-                cwd: r.cwd,
-                rerouted: r.rerouted,
-                output: None,
-                exit_code: None,
-                spawned_pid: None,
-                timed_out: false,
-                note: r.act.note,
-                error: Some(e),
-            }),
+                ));
+                out.spawned_pid = Some(pid);
+            }
+            Err(e) => out.error = Some(e),
         }
     } else {
-        let outcome = exec::run_blocking(prog, base_args, &r.cmd, &r.cwd, &r.env, r.act.timeout_ms);
-        match outcome {
-            Ok(o) => Ok(RunActionResult {
-                service_id,
-                action,
-                effective_action: r.effective,
-                executed: true,
-                danger,
-                requires_confirm: false,
-                sudo_required: false,
-                command: r.cmd,
-                cwd: r.cwd,
-                rerouted: r.rerouted,
-                output: Some(o.combined),
-                exit_code: Some(o.code),
-                spawned_pid: None,
-                timed_out: o.timed_out,
-                note: r.act.note,
-                error: if o.timed_out {
-                    Some(format!("命令在 {}ms 内未结束，已终止", r.act.timeout_ms))
-                } else {
-                    None
-                },
-            }),
-            Err(e) => Ok(RunActionResult {
-                service_id,
-                action,
-                effective_action: r.effective,
-                executed: false,
-                danger,
-                requires_confirm: false,
-                sudo_required: false,
-                command: r.cmd,
-                cwd: r.cwd,
-                rerouted: r.rerouted,
-                output: None,
-                exit_code: None,
-                spawned_pid: None,
-                timed_out: false,
-                note: r.act.note,
-                error: Some(e),
-            }),
+        match exec::run_blocking(prog, base_args, &r.cmd, &r.cwd, &r.env, timeout_ms) {
+            Ok(o) => {
+                out.executed = true;
+                out.output = Some(o.combined);
+                out.exit_code = Some(o.code);
+                out.timed_out = o.timed_out;
+                if o.timed_out {
+                    out.error = Some(format!("命令在 {timeout_ms}ms 内未结束，已终止"));
+                }
+            }
+            Err(e) => out.error = Some(e),
         }
     }
-}
 
-/// 后台拉起一个长任务（start/restart）。脱离 Tauri 进程组，
-/// stdio 全部丢弃，立即返回子进程 pid，不阻塞等待。
-///
-/// 注意：macOS 没有 setsid 二进制，真正的 TTY 解耦由 manifest 的
-/// `script -q` / `perl POSIX::setsid` 包装负责；这里只保证 Rust 侧不卡住。
-/// （实现见 crate::exec::spawn_detached）
+    Ok(out)
+}
 
 /// V0.1 的极简前置条件求值：只认 `supervised == true|false` 这一种形态。
 ///
@@ -537,13 +614,45 @@ pub fn run_doctor() -> Result<Vec<crate::doctor::DoctorCheck>, String> {
     crate::doctor::run_doctor()
 }
 
-/// 让前端把当前健康结论同步到托盘 tooltip。客户端常驻后台时，
-/// 一眼就能从菜单栏图标看到整体状态（无需点开窗口）。
+// ───────────────────────────── V0.3 一键修复 ─────────────────────────────
+
 #[tauri::command]
-pub fn update_tray_status(app: tauri::AppHandle, status: String) -> Result<(), String> {
-    if let Some(tray) = app.tray_by_id("lsh-tray") {
-        tray.set_tooltip(Some(status))
-            .map_err(|e| format!("更新托盘状态失败: {e}"))?;
+pub fn apply_fix(id: String, confirmed: bool) -> Result<crate::pb::FixApplyResult, String> {
+    let pb = crate::pb::get_playbook(&id)?;
+    crate::pb::apply_fix(&pb, confirmed)
+}
+
+/// 把当前健康结论同步到托盘：换图标 + 改 tooltip。
+///
+/// 常驻后台时菜单栏图标就是全部信息 —— 不用点开窗口也能看出
+/// 是有服务挂了（红）、有隐患（琥珀）、还是一切正常（绿）。
+///
+/// 图标用 include_bytes! 编译进二进制，不依赖运行时资源路径，
+/// 打包后也不会找不到文件。
+#[tauri::command]
+pub fn update_tray_status(
+    app: tauri::AppHandle,
+    status: String,
+    level: Option<String>,
+) -> Result<(), String> {
+    let Some(tray) = app.tray_by_id("lsh-tray") else {
+        return Ok(());
+    };
+
+    tray.set_tooltip(Some(status))
+        .map_err(|e| format!("更新托盘状态失败: {e}"))?;
+
+    let level = level.unwrap_or_else(|| "ok".into());
+    let bytes: &[u8] = match level.as_str() {
+        "fail" | "error" | "down" => include_bytes!("../icons/tray-fail.png"),
+        "warn" | "warning" => include_bytes!("../icons/tray-warn.png"),
+        _ => include_bytes!("../icons/tray-ok.png"),
+    };
+
+    // set_icon 失败不该让整个状态同步挂掉：tooltip 已经更新，
+    // 图标退化为不变即可，用户依然能从文字看到结论。
+    if let Ok(img) = tauri::image::Image::from_bytes(bytes) {
+        let _ = tray.set_icon(Some(img));
     }
     Ok(())
 }
@@ -596,6 +705,7 @@ mod tests {
             note: None,
             precondition: None,
             fallback_action: None,
+            wrap: None,
         };
         assert_eq!(effective_danger(&a), "sudo");
 
@@ -626,6 +736,68 @@ mod tests {
         assert!(r.output.is_some(), "应捕获到输出");
         assert!(r.exit_code.is_some(), "应拿到退出码");
         assert!(!r.sudo_required);
+    }
+
+    /// 五种 supervisor 的包装策略必须各就各位，这是"能否真正拉起服务"的分水岭。
+    fn wrap_of(service: &str, action: &str) -> String {
+        let r = resolve_action(service, action)
+            .unwrap_or_else(|e| panic!("{service}/{action} 解析失败: {e}"));
+        wrap_view(&r.wrap)
+    }
+
+    #[test]
+    fn script_services_start_with_setsid() {
+        // odysseus / chromadb 是 start.sh 拉起的常驻进程。
+        // 不 setsid 就会留在客户端会话里，客户端一退服务跟着没。
+        for id in ["odysseus", "chromadb"] {
+            assert_eq!(wrap_of(id, "start"), "setsid", "{id} 的 start 必须包 setsid");
+        }
+    }
+
+    #[test]
+    fn launchctl_actions_are_never_pty_wrapped() {
+        // dsh 的 start 走 launchctl，而它的 plist 自己就写了 script -q。
+        // 客户端再包一层 pty 会抢走终端，导致 launchctl 拿不到干净输出。
+        assert_eq!(wrap_of("dsh", "start"), "none");
+        let r = resolve_action("dsh", "start").unwrap();
+        let reason = r.wrap_reason.unwrap_or_default();
+        assert!(
+            reason.contains("launchctl"),
+            "理由应说明 TTY 由 plist 负责，实际: {reason}"
+        );
+    }
+
+    #[test]
+    fn short_actions_are_never_wrapped() {
+        // stop/status/bootstrap 跑完就退，不存在"被会话回收"的问题，别多此一举。
+        assert_eq!(wrap_of("odysseus", "status"), "none");
+        assert_eq!(wrap_of("chromadb", "stop"), "none");
+    }
+
+    #[test]
+    fn app_launchd_docker_need_no_wrap() {
+        // 这三类要么由系统 API 接管（app），要么由守护进程接管（launchd/docker），
+        // 客户端只负责发命令，不需要也不应该自己包进程。
+        for id in ["ollama", "searxng", "omniroute"] {
+            assert_eq!(wrap_of(id, "start"), "none", "{id} 由外部守护接管，无需包装");
+        }
+    }
+
+    #[test]
+    fn wrapped_command_is_rendered_for_ui() {
+        // 用户必须能看到"实际执行的不只是你写的那行"，否则无法信任客户端。
+        let p = preview_action("odysseus".into(), "start".into()).unwrap();
+        assert_eq!(p.wrap, "setsid");
+        assert!(
+            p.wrapped_command.starts_with("perl -MPOSIX"),
+            "包装后的命令应以 perl 开头: {}",
+            p.wrapped_command
+        );
+        assert!(
+            p.wrapped_command.contains("./start.sh"),
+            "目标命令必须原样出现在末尾: {}",
+            p.wrapped_command
+        );
     }
 
     #[test]

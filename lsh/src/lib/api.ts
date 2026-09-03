@@ -12,6 +12,7 @@ import type {
   LogSourceView,
   LogTail,
   DoctorCheck,
+  FixApplyResult,
 } from '../types'
 
 /** 自己判定，避免依赖特定版本的导出符号 */
@@ -59,6 +60,9 @@ export async function previewAction(
       cwd: '',
       rerouted: null,
       note: null,
+      wrap: 'none',
+      wrap_reason: null,
+      wrapped_command: '',
     }
   }
   return invoke<ActionPreview>('preview_action', { serviceId, action })
@@ -108,6 +112,14 @@ export async function diagnosePlaybook(id: string): Promise<DiagnoseResult> {
   return invoke<DiagnoseResult>('diagnose_playbook', { id })
 }
 
+/** V0.3 一键修复。confirmed=false 且剧本需确认时只返回 needs_confirm，不执行写动作。 */
+export async function applyFix(id: string, confirmed: boolean): Promise<FixApplyResult> {
+  if (!isTauri()) {
+    throw new Error('修复需要 Tauri 运行环境，请用 pnpm tauri:dev 启动')
+  }
+  return invoke<FixApplyResult>('apply_fix', { id, confirmed })
+}
+
 // ───────────────────────────── 日志中心（V0.2） ─────────────────────────────
 
 export async function listLogSources(serviceId: string): Promise<LogSourceView[]> {
@@ -140,8 +152,14 @@ export async function runDoctor(): Promise<DoctorCheck[]> {
   return invoke<DoctorCheck[]>('run_doctor')
 }
 
-/** 把当前整体健康结论同步到托盘 tooltip（常驻后台时一眼可见） */
-export async function updateTrayStatus(status: string): Promise<void> {
+/**
+ * 把当前整体健康结论同步到托盘（常驻后台时一眼可见）。
+ * level 决定菜单栏图标颜色：ok=绿 / warn=琥珀 / fail=红。
+ */
+export async function updateTrayStatus(
+  status: string,
+  level: 'ok' | 'warn' | 'fail' = 'ok'
+): Promise<void> {
   if (!isTauri()) return
-  await invoke('update_tray_status', { status })
+  await invoke('update_tray_status', { status, level })
 }

@@ -148,7 +148,39 @@ function drawTray(size) {
   return c.toPng()
 }
 
+/**
+ * 状态托盘图（彩色，非 template）。
+ *
+ * 常驻后台时，菜单栏图标的颜色就是全部信息：
+ * 不用点开窗口也知道现在是有服务挂了（红）、有隐患（琥珀）、还是一切正常（绿）。
+ * 所以这里刻意不用 template —— template 会丢掉颜色，状态灯就没意义了。
+ *
+ * 图案是三张服务卡片，顶部那张的灯用状态色，下面两张保持灰色。
+ */
+function drawTrayState(size, light) {
+  const s = size / 22
+  const c = new Canvas(size)
+  const CARD = [58, 68, 82, 255]
+  const DIM = [92, 104, 122, 200]
+
+  const rows = [3, 9, 15]
+  rows.forEach((y, i) => {
+    c.roundRect(3 * s, y * s, 16 * s, 4 * s, 1.5 * s, CARD)
+    // 只有第一张卡片的灯反映整体状态，其余压暗，避免三色打架看不清
+    c.circle(6 * s, (y + 2) * s, i === 0 ? 1.7 * s : 1.3 * s, i === 0 ? light : DIM)
+    c.roundRect(9 * s, (y + 1.6) * s, 8 * s, 0.8 * s, 0.4 * s, DIM)
+  })
+
+  // 状态色外圈光晕：菜单栏只有 22pt，靠这圈提高辨识度
+  const glow = [light[0], light[1], light[2], 70]
+  c.circle(6 * s, 5 * s, 3.4 * s, glow)
+  c.circle(6 * s, 5 * s, 1.7 * s, light)
+  return c.toPng()
+}
+
 mkdirSync(OUT, { recursive: true })
+
+const RED = [239, 68, 68, 255]
 
 const targets = [
   ['32x32.png', drawIcon(32)],
@@ -157,6 +189,10 @@ const targets = [
   ['icon.png', drawIcon(512)],
   ['tray.png', drawTray(22)],
   ['tray@2x.png', drawTray(44)],
+  // 状态图固定 44px（@2x 尺寸），由系统按需缩放
+  ['tray-ok.png', drawTrayState(44, GREEN)],
+  ['tray-warn.png', drawTrayState(44, AMBER)],
+  ['tray-fail.png', drawTrayState(44, RED)],
 ]
 
 for (const [name, buf] of targets) {
