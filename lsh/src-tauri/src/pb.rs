@@ -2278,4 +2278,75 @@ verify:
             r.rollback_note
         );
     }
+
+    /// 端到端：assisted + confirmed=true → 真实执行 echo 步骤，verify 通过，不触发回滚
+    #[test]
+    fn apply_fix_assisted_confirmed_executes_and_verifies() {
+        let yaml = r#"
+schema: "lsh/playbook/v1"
+id: lsh-test-assisted-e2e
+title: 一键修复端到端测试
+trigger:
+  any_of: []
+diagnose:
+  - id: d
+    title: d
+    exec:
+      cmd: "echo diagnosing"
+conclude:
+  - when: "true"
+    root_cause: 测试用
+fix:
+  mode: assisted
+  confirm: false
+  steps:
+    - id: s1
+      title: 执行无害命令
+      type: exec
+      cmd: "echo fixed"
+      snapshot: false
+verify:
+  cmd: "true"
+  timeout_ms: 5000
+"#;
+        let pb: Playbook = serde_yaml::from_str(yaml).expect("parse");
+        let r = apply_fix(&pb, true).expect("apply");
+
+        assert!(
+            r.executed,
+            "assisted+confirmed 应执行步骤，实际 executed=false"
+        );
+        assert!(
+            !r.needs_confirm,
+            "confirmed=true 不应要求二次确认"
+        );
+        assert!(
+            !r.rejected_sudo,
+            "不应拒绝 sudo（本测试不需要 sudo）"
+        );
+        assert!(
+            r.verify.is_some(),
+            "应执行 verify"
+        );
+        let verify = r.verify.as_ref().unwrap();
+        assert!(
+            verify.passed,
+            "verify 用 true 命令应通过，实际: {:?}",
+            verify
+        );
+        assert!(
+            r.rollback_note.is_none(),
+            "复检通过就不该回滚，实际 rollback_note: {:?}",
+            r.rollback_note
+        );
+        // 检查步骤执行结果
+        assert!(!r.steps.is_empty(), "应至少有 1 步执行记录");
+        let first_step = &r.steps[0];
+        assert_eq!(first_step.id, "s1");
+        assert!(
+            first_step.exit == Some(0),
+            "echo fixed 应退出码 0，实际: {:?}",
+            first_step.exit
+        );
+    }
 }
