@@ -688,6 +688,77 @@ fn run_probe_container(service: &str, probe: &str, l3: &crate::model::ProbeL3) -
     apply_assert(service, probe, &v, l3.assert.as_deref(), &HashMap::new())
 }
 
+/// 运行 L2 HTTP 探针。
+///
+/// 执行步骤：
+///   1. 从 manifest 读取 l2 配置（url、method、expect_status、timeout_ms）
+///   2. 用 curl 发起 HTTP 请求（注入 NO_PROXY 避免沙箱代理劫持）
+///   3. 返回 { ok, status, expect_status, ms, body }
+///
+/// 注意：L2 探针只在用户点击时运行（不在启动时扫描），避免启动时网络请求阻塞 UI。
+pub fn run_l2_probe(service: &str, m: &crate::model::ServiceManifest) -> Result<Value, String> {
+    let l2 = m.health.l2.as_ref()
+        .ok_or_else(|| format!("服务 {service} 未声明 L2 探针"))?;
+    
+    let method = l2.method.as_str();
+    let expect_status = l2.expect_status;
+    let timeout_ms = l2.timeout_ms.max(1);
+    
+    // 构造 curl 参数
+    let mut args: Vec<String> = vec![
+        "--silent".into(),
+        "--max-time".into(), timeout_ms.to_string(),
+        "-X".into(), method.into(),
+    ];
+    if let Some(body) = &l2.expect_body {
+        args.push("-H".into());
+        args.push("Content-Type: application/json".into());
+        args.push("-d".into());
+        args.push(body.clone());
+    }
+    args.push(l2.url.clone());
+    
+    // 用 Command 直接执行，注入 NO_PROXY 避免沙箱代理劫持
+    let mut command = std::process::Command::new("curl");
+    command.env("NO_PROXY", "127.0.0.1,localhost")
+        .args(&args.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    
+    let mut child = command.spawn()
+        .map_err(|e| format!("curl 启动失败 [{service}]: {e}"))?;
+    
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis((timeout_ms + 1000).min(10_000));
+    let mut timed_out = false;
+    let out = loop {
+        match child.try_wait().map_err(|e| format!("curl 等待失败 [{service}]: {e}"))? {
+            Some(_) => break child.wait_with_output().map_err(|e| format!("curl 读取输出失败 [{service}]: {e}"))?,
+            None => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    timed_out = true;
+                    break child.wait_with_output().map_err(|e| format!("curl 超时读取输出失败 [{service}]: {e}"))?;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    };
+
+    let t0 = std::time::Instant::now();
+    let code = out.status.code().unwrap_or(-1);
+    let status = if timed_out { 0 } else { code as u16 };
+    let ok = status == expect_status;
+
+    let ms = t0.elapsed().as_millis() as u64;
+    Ok(serde_json::json!({
+        "ok": ok,
+        "status": status,
+        "expect_status": expect_status,
+        "ms": ms,
+    }))
+}
+
 /// 若 l3.assert 存在，用 eval_expr 求值；通过返回原始结果，不通过返回 {ok:false, error}
 ///
 /// 变量作用域（按优先级）：

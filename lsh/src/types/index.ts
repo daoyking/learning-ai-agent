@@ -34,6 +34,14 @@ export interface PortConflict {
   pid: number
 }
 
+/** L2 HTTP 探针结果（curl 健康检查） */
+export interface L2ProbeStatus {
+  ok: boolean
+  status: number
+  expect_status: number
+  ms: number
+}
+
 export interface ServiceCard {
   id: string
   name: string
@@ -57,6 +65,8 @@ export interface ServiceCard {
   playbooks: string[]
   l3_count: number
   log_count: number
+  /** L2 HTTP 探针结果（手动触发时填充，启动时不运行） */
+  l2_status: L2ProbeStatus | null
 }
 
 /** preview_action 返回：将要执行的命令 + 安全等级 */

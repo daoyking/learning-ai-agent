@@ -155,7 +155,7 @@ trigger（可观测症状） → diagnose（只读取证） → conclude（带�
 
 ### 🚧 待办
 
-- [ ] L2 HTTP 探针（V0.4）
+- [x] L2 HTTP 探针（V0.6）—— 手动触发 HTTP 健康检查，显示状态码+耗时
 - [ ] openclaw gateway 实际运行验证
 - [ ] AnythingLLM API key 配置接入
 - [ ] ChromaDB 0.6.x API bug 跟踪（降级报告已处理）

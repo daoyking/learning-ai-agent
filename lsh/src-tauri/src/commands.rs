@@ -40,6 +40,16 @@ pub struct ServiceCard {
     /// 声明了几个 L3 语义探针（UI 提示"语义探针待接入"）
     pub l3_count: usize,
     pub log_count: usize,
+    /// L2 HTTP 探针结果（ok + status + ms）
+    pub l2_status: Option<L2ProbeStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L2ProbeStatus {
+    pub ok: bool,
+    pub status: u16,
+    pub expect_status: u16,
+    pub ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -410,6 +420,7 @@ fn build_card(m: &ServiceManifest, ports: &[PortEntry]) -> ServiceCard {
         playbooks: m.playbooks.clone(),
         l3_count: m.health.l3.len(),
         log_count: m.logs.len(),
+        l2_status: None, // 启动时不运行 L2（仅在用户点击时运行）
     }
 }
 
@@ -588,6 +599,17 @@ pub fn diagnose_playbook(id: String) -> Result<crate::pb::DiagnoseResult, String
 #[tauri::command]
 pub fn run_probes() -> Result<Vec<crate::pb::ProbeRun>, String> {
     crate::pb::run_all_probes()
+}
+
+/// 运行 L2 HTTP 探针，返回单个服务的 L2 健康结果。
+#[tauri::command]
+pub fn run_l2_probe(service_id: String) -> Result<serde_json::Value, String> {
+    let manifests = crate::registry::load_manifests()?;
+    let m = manifests
+        .iter()
+        .find(|m| m.id == service_id)
+        .ok_or_else(|| format!("找不到服务 {service_id}"))?;
+    crate::pb::run_l2_probe(&service_id, m)
 }
 
 // ───────────────────────────── 日志中心（V0.2：聚合尾部 + 旋转） ─────────────────────────────

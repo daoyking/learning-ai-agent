@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
   ActionPreview,
+  L2ProbeStatus,
   MatchContext,
   PlaybookSummary,
   DiagnoseResult,
@@ -162,4 +163,13 @@ export async function updateTrayStatus(
 ): Promise<void> {
   if (!isTauri()) return
   await invoke('update_tray_status', { status, level })
+}
+
+// ───────────────────────────── L2 HTTP 探针（V0.6） ─────────────────────────────
+
+export async function runL2Probe(serviceId: string): Promise<L2ProbeStatus> {
+  if (!isTauri()) {
+    throw new Error('L2 探针需要 Tauri 运行环境，请用 pnpm tauri:dev 启动')
+  }
+  return invoke<L2ProbeStatus>('run_l2_probe', { serviceId })
 }

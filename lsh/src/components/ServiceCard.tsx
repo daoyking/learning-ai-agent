@@ -1,5 +1,7 @@
-import type { ServiceCard as Card, SupervisionState } from '../types'
+import type { ServiceCard as Card, L2ProbeStatus, SupervisionState } from '../types'
 import { StatusDot, statusLabel } from './StatusDot'
+import { runL2Probe } from '../lib/api'
+import { useState } from 'react'
 
 const SUPERVISION: Record<
   SupervisionState,
@@ -47,6 +49,23 @@ interface Props {
 export function ServiceCard({ card, onManage }: Props) {
   const conflict = card.port_conflict
   const sup = SUPERVISION[card.supervised ?? 'not_applicable']
+  const [l2Status, setL2Status] = useState<L2ProbeStatus | null>(card.l2_status ?? null)
+  const [l2Loading, setL2Loading] = useState(false)
+  const [l2Error, setL2Error] = useState<string | null>(null)
+
+  const handleL2Probe = async () => {
+    if (!card.id) return
+    setL2Loading(true)
+    setL2Error(null)
+    try {
+      const result = await runL2Probe(card.id)
+      setL2Status(result)
+    } catch (e) {
+      setL2Error(String(e))
+    } finally {
+      setL2Loading(false)
+    }
+  }
 
   return (
     <div className="card flex flex-col gap-2.5">
@@ -95,6 +114,30 @@ export function ServiceCard({ card, onManage }: Props) {
       {conflict && (
         <div className="rounded border border-status-degraded/40 bg-status-degraded/10 px-2 py-1.5 text-[11px] text-status-degraded">
           端口 {conflict.port} 被 <b>{conflict.command}</b> (pid {conflict.pid}) 占用
+        </div>
+      )}
+
+      {/* L2 HTTP 探针结果 */}
+      {card.l3_count === 0 && (
+        <div className="flex items-center justify-between rounded border border-ink-700 bg-ink-900/50 px-2 py-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-500">L2 HTTP 探针</span>
+            {l2Status && (
+              <span className={`text-[10px] ${l2Status.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {l2Status.ok ? '✓' : '✗'} :{l2Status.status} ({l2Status.ms}ms)
+              </span>
+            )}
+            {l2Error && (
+              <span className="text-[10px] text-rose-400">{l2Error}</span>
+            )}
+          </div>
+          <button
+            onClick={handleL2Probe}
+            disabled={l2Loading}
+            className="rounded border border-ink-600 px-2 py-0.5 text-[10px] text-slate-400 transition-colors hover:border-slate-500 hover:text-slate-200 disabled:opacity-40"
+          >
+            {l2Loading ? '检测中…' : '检测'}
+          </button>
         </div>
       )}
 
