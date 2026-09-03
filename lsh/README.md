@@ -134,25 +134,31 @@ trigger（可观测症状） → diagnose（只读取证） → conclude（带�
 
 ## 当前进度
 
-### ✅ 已完成（V0.1 地基）
+### ✅ 已完成
 
 - [x] **Manifest schema + 9 个服务 YAML**（全部通过 JSON Schema 校验）
 - [x] **Playbook schema + 13 个剧本**
 - [x] **Tauri 2 + React + TS 工程骨架**（`cargo check` 通过，`pnpm build` 通过）
 - [x] **最小闭环跑通**：扫描本机端口 → 合并 manifest → 渲染服务卡片
 - [x] 依赖图校验（引用完整性 + 无环）
-- [x] 未纳管端口自动发现（47 个端口里筛出 38 个未纳管）
+- [x] 未纳管端口自动发现
 - [x] 启停命令 dry-run 预览
+- [x] L3 语义探针引擎：4 种类型（script/http_json/llm_echo/container_exec）+ assert 作用域
+- [x] 14 个 L3 探针脚本落地（7/14 通过，其余缺凭据/服务未运行属预期）
+- [x] Playbook 引擎：expr 白名单解析器 + matcher + diagnose + apply_fix（含快照/回滚）
+- [x] 五种 supervisor 真实启停（setsid/pty/launchd/docker/app）
+- [x] 日志中心（多源 tail + copytruncate 轮转）
+- [x] 环境体检 Doctor
+- [x] 托盘常驻（三色状态：绿/黄/红）
+- [x] 一键修复 UI（二次确认弹窗 + 执行进度 + 修复后复诊）
+- [x] NO_PROXY 注入修复（沙箱代理劫持本地请求问题）
 
 ### 🚧 待办
 
-- [ ] L2 HTTP 探针（V0.2）
-- [ ] L3 语义探针脚本落地（`manifests/probes/*.mjs`，schema 已定义 14 个）
-- [ ] 五种 supervisor 的真实启停（当前只有 dry-run）
-- [ ] Playbook 引擎：matcher / runner / expr 解析器
-- [ ] 日志中心（多源 tail + copytruncate 轮转）
-- [ ] 环境体检 Doctor（睡眠 / 内存 / 代理 / 端口冲突）
-- [ ] 托盘常驻
+- [ ] L2 HTTP 探针（V0.4）
+- [ ] openclaw gateway 实际运行验证
+- [ ] AnythingLLM API key 配置接入
+- [ ] ChromaDB 0.6.x API bug 跟踪（降级报告已处理）
 
 ---
 
