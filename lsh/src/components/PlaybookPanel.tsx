@@ -123,7 +123,11 @@ export function PlaybookPanel() {
 
       <main className="flex-1 overflow-y-auto px-5 py-4">
         {selected ? (
-          <DiagnoseView result={selected} onBack={() => setSelected(null)} />
+          <DiagnoseView
+            result={selected}
+            onBack={() => setSelected(null)}
+            onReDiagnose={openDiagnose}
+          />
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* 左：命中剧本 */}
@@ -209,9 +213,11 @@ export function PlaybookPanel() {
 function DiagnoseView({
   result,
   onBack,
+  onReDiagnose,
 }: {
   result: DiagnoseResult
   onBack: () => void
+  onReDiagnose: (id: string) => void
 }) {
   const matchedConclusions = result.conclusions.filter((c) => c.matched)
   const sev = SEVERITY_BADGE[result.severity] ?? { label: result.severity, cls: 'bg-ink-700 text-slate-400' }
@@ -288,7 +294,11 @@ function DiagnoseView({
 
       {/* 修复（V0.3：assisted/auto 可一键执行；manual 仅展示） */}
       {result.fix && result.fix.steps.length > 0 && (
-        <FixRunner fix={result.fix} playbookId={result.id} />
+        <FixRunner
+          fix={result.fix}
+          playbookId={result.id}
+          onReDiagnose={onReDiagnose}
+        />
       )}
     </div>
   )
@@ -349,12 +359,38 @@ const MODE_LABEL: Record<string, string> = {
  *   2. requires_sudo    → 提权动作一律不代执行（同启停的安全红线）
  *   3. needs_confirm    → 后端要求确认时先回 needs_confirm，由用户点头再跑
  */
-function FixRunner({ fix, playbookId }: { fix: FixPreview; playbookId: string }) {
+function riskBadgeClass(risk: string): string {
+  return risk === 'high'
+    ? 'bg-rose-500/20 text-rose-300'
+    : risk === 'medium'
+      ? 'bg-amber-500/20 text-amber-300'
+      : 'bg-emerald-500/20 text-emerald-300'
+}
+
+/**
+ * 修复执行器。
+ *
+ * 三道闸门，任何一道不满足就不代执行 —— 这是"一键修复"能让人放心的前提：
+ *   1. mode=manual      → 只展示命令，用户自己在终端跑
+ *   2. requires_sudo    → 提权动作一律不代执行（同启停的安全红线）
+ *   3. fix.confirm=true → 先弹二次确认框，点「确认执行」才真正代跑
+ *      （后端对应 apply_fix(id, confirmed=true)；未确认时不执行任何写操作）
+ */
+function FixRunner({
+  fix,
+  playbookId,
+  onReDiagnose,
+}: {
+  fix: FixPreview
+  playbookId: string
+  onReDiagnose: (id: string) => void
+}) {
   const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [result, setResult] = useState<FixApplyResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const run = useCallback(async () => {
+  const execute = useCallback(async () => {
     setBusy(true)
     setError(null)
     try {
@@ -365,6 +401,14 @@ function FixRunner({ fix, playbookId }: { fix: FixPreview; playbookId: string })
       setBusy(false)
     }
   }, [playbookId])
+
+  const onPrimary = useCallback(() => {
+    if (fix.confirm) {
+      setConfirming(true)
+    } else {
+      void execute()
+    }
+  }, [fix.confirm, execute])
 
   const blocked =
     fix.mode === 'manual'
@@ -385,16 +429,29 @@ function FixRunner({ fix, playbookId }: { fix: FixPreview; playbookId: string })
         ) : (
           <div className="flex items-center gap-2">
             <button
-              onClick={run}
+              onClick={onPrimary}
               disabled={busy}
-              className="rounded bg-emerald-600 px-3 py-1 text-[11px] text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1 text-[11px] text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
             >
-              {busy ? '执行中…' : '一键修复'}
+              {busy ? (
+                <>
+                  <span className="h-3 w-3 animate-spin rounded-full border border-white/40 border-t-white" />
+                  执行中…
+                </>
+              ) : (
+                '一键修复'
+              )}
             </button>
             <span className="text-[10px] text-slate-500">
               {MODE_LABEL[fix.mode] ?? fix.mode}
               {fix.confirm && ' · 需确认'}
             </span>
+          </div>
+        )}
+
+        {busy && !result && (
+          <div className="mt-2 text-[10px] text-slate-500">
+            正在执行修复步骤（快照 → 执行 → 复检）…
           </div>
         )}
 
@@ -404,13 +461,93 @@ function FixRunner({ fix, playbookId }: { fix: FixPreview; playbookId: string })
           </div>
         )}
 
-        {result && <FixResultView result={result} />}
+        {result && <FixResultView result={result} onReDiagnose={() => onReDiagnose(playbookId)} />}
       </Section>
+
+      {confirming && (
+        <ConfirmFixModal
+          fix={fix}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            setConfirming(false)
+            void execute()
+          }}
+        />
+      )}
     </>
   )
 }
 
-function FixResultView({ result }: { result: FixApplyResult }) {
+/** 二次确认弹窗：列清要改什么、风险与副作用，点「确认执行」才真正代跑 */
+function ConfirmFixModal({
+  fix,
+  onCancel,
+  onConfirm,
+}: {
+  fix: FixPreview
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-lg border border-ink-600 bg-ink-900 p-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-2 text-sm font-semibold text-slate-100">确认执行修复？</h3>
+        <div className="mb-3 flex items-center gap-2 text-[10px]">
+          <span className={`rounded px-1.5 py-0.5 ${riskBadgeClass(fix.risk)}`}>
+            风险 {fix.risk}
+          </span>
+          <span className="rounded bg-ink-700 px-1.5 py-0.5 text-slate-400">
+            副作用 {fix.side_effects}
+          </span>
+        </div>
+        <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
+          将执行以下 {fix.steps.length} 个步骤。执行前会对可快照的文件做备份，
+          任一步失败或复检不通过都会自动回滚。确认后才真正动手。
+        </p>
+        <ul className="mb-4 max-h-40 space-y-1 overflow-y-auto">
+          {fix.steps.map((s) => (
+            <li key={s.id} className="flex gap-1.5 text-[10px] text-slate-400">
+              <span className="text-slate-600">›</span>
+              <span className="flex-1">
+                <span className="text-slate-300">{s.title}</span>
+                <span className="ml-1.5 font-mono text-slate-600">{s.kind}</span>
+                {s.snapshot && <span className="ml-1.5 text-sky-400">· 快照</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded border border-ink-600 px-3 py-1 text-[11px] text-slate-300 transition-colors hover:border-slate-500"
+          >
+            取消
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded bg-emerald-600 px-3 py-1 text-[11px] text-white transition-colors hover:bg-emerald-500"
+          >
+            确认执行
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FixResultView({
+  result,
+  onReDiagnose,
+}: {
+  result: FixApplyResult
+  onReDiagnose: () => void
+}) {
   if (result.rejected_sudo) {
     return (
       <div className="mt-2 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-300">
@@ -479,6 +616,15 @@ function FixResultView({ result }: { result: FixApplyResult }) {
         <div className="rounded border border-ink-700 bg-ink-900 px-2 py-1.5 text-[10px] text-slate-400">
           回滚方式：{result.rollback_note}
         </div>
+      )}
+
+      {result.executed && !result.rejected_sudo && !result.needs_confirm && (
+        <button
+          onClick={onReDiagnose}
+          className="mt-1 rounded border border-ink-600 px-2.5 py-1 text-[11px] text-slate-300 transition-colors hover:border-slate-500 hover:text-slate-100"
+        >
+          ↻ 重新诊断，验证是否修复
+        </button>
       )}
     </div>
   )
