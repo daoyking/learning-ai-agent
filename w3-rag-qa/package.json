@@ -10,6 +10,7 @@
     "build": "vite build",
     "start": "tsx server/index.ts",
     "eval": "tsx evals/run.ts",
+    "eval:baseline": "tsx evals/baseline.ts",
     "test": "node --import tsx --test tests/eval.test.ts"
   },
   "dependencies": {

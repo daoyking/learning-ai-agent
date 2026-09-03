@@ -37,7 +37,7 @@ health:
       type: http_json
       url: 'http://127.0.0.1:11434/api/tags'
       jq: 'models'
-      assert: 'len(models) > 0'
+      assert: 'len(raw_response.models) > 0'
       cost: free
       note: '重灌系统后模型目录会空，此时 /api/tags 返回 200 但 models 为空数组。'
     - id: inference-works

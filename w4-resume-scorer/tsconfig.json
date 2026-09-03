@@ -11,5 +11,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["index.ts", "agents", "tools", "workflows"]
+  "include": ["index.ts", "agents", "tools", "workflows", "evals"]
 }

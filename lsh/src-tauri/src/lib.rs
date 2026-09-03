@@ -1,11 +1,11 @@
-mod commands;
-mod doctor;
-mod exec;
-mod logs;
-mod model;
-mod pb;
-mod registry;
-mod scanner;
+pub mod commands;
+pub mod doctor;
+pub mod exec;
+pub mod logs;
+pub mod model;
+pub mod pb;
+pub mod registry;
+pub mod scanner;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;

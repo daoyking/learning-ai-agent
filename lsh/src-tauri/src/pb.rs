@@ -447,7 +447,11 @@ fn probe_path() -> PathBuf {
         .join("probes")
 }
 
-/// 运行单个 L3 探针脚本（node <script>），返回其末行 JSON 解析后的对象。
+/// 运行单个 L3 探针。支持 4 种 type：
+///   script      — node <path>，末行 JSON 为结果（保留原始 ok 字段，assert 可选）
+///   http_json   — curl <url> + jq <jq> 抽子路径，eval <assert> 作断言
+///   llm_echo    — POST /api/chat（Ollama 兼容），返回 {done, ms, ok}
+///   container_exec — docker exec <container> <cmd>， stdout 末行 JSON
 pub fn run_probe(service: &str, probe: &str) -> Result<Value, String> {
     let manifests = registry::load_manifests()?;
     let m = manifests
@@ -460,18 +464,277 @@ pub fn run_probe(service: &str, probe: &str) -> Result<Value, String> {
         .iter()
         .find(|p| p.id == probe)
         .ok_or_else(|| format!("服务 {service} 无探针 {probe}"))?;
+    match l3.r#type.as_str() {
+        "script" => run_probe_script(service, probe, l3, true), // 不强制 assert（保留原始 ok）
+        "http_json" => run_probe_http_json(service, probe, l3), // 强制 assert
+        "llm_echo" => run_probe_llm_echo(service, probe, l3),
+        "container_exec" => run_probe_container(service, probe, l3), // 强制 assert
+        other => Err(format!("未知探针类型 {other}: {service}.{probe}")),
+    }
+}
+
+fn run_probe_script(service: &str, probe: &str, l3: &crate::model::ProbeL3, enforce_assert: bool) -> Result<Value, String> {
     let script = l3
         .script
         .as_deref()
         .ok_or_else(|| format!("探针 {probe} 未声明 script"))?;
     let rel = script.trim_start_matches("probes/");
     let path = probe_path().join(rel);
-
-    let out = exec::run_blocking("node", &[], &path.to_string_lossy().to_string(), ".", &HashMap::new(), 150_000)
+    let out = exec::run_blocking("node", &[], &path.to_string_lossy().to_string(), ".", &HashMap::new(), l3.timeout_ms)
         .map_err(|e| format!("运行探针 {service}.{probe} 失败: {e}"))?;
+    let v = parse_last_json(&out.combined)
+        .ok_or_else(|| format!("探针 {service}.{probe} 输出非 JSON: {}", out.combined.trim()))?;
+    if enforce_assert {
+        apply_assert(service, probe, &v, l3.assert.as_deref(), &HashMap::new())
+    } else {
+        Ok(v) // 保留探针自己的 ok 字段
+    }
+}
 
-    parse_last_json(&out.combined)
-        .ok_or_else(|| format!("探针 {service}.{probe} 输出非 JSON: {}", out.combined.trim()))
+fn run_probe_http_json(service: &str, probe: &str, l3: &crate::model::ProbeL3) -> Result<Value, String> {
+    let url = l3.url.as_deref()
+        .ok_or_else(|| format!("探针 {probe} 缺 url"))?;
+    let method = l3.method.as_str();
+    let jq = l3.jq.as_deref().unwrap_or(".");
+    let timeout = l3.timeout_ms.max(1);
+    // 构造 curl 参数列表
+    let mut args: Vec<String> = vec![
+        "--silent".into(),
+        "--max-time".into(), timeout.to_string(),
+        "-X".into(), method.into(),
+        "-H".into(), "Content-Type: application/json".into(),
+        url.into(),
+    ];
+    if let Some(b) = &l3.body {
+        args.push("-d".into());
+        args.push(serde_json::to_string(b).map_err(|e| format!("body 序列化失败: {e}"))?);
+    }
+    // 直接用 Command 而非 run_blocking：run_blocking 会把 cmd 参数追加到 base_args 后面，
+    // 而我们这里需要精确控制参数顺序，URL 必须是最后一个位置参数。
+    let mut command = std::process::Command::new("curl");
+    command.args(&args.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let mut child = command.spawn()
+        .map_err(|e| format!("curl 启动失败 [{service}.{probe}]: {e}"))?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis((timeout + 1000).min(30_000));
+    let mut timed_out = false;
+    let out = loop {
+        match child.try_wait().map_err(|e| format!("curl 等待失败 [{service}.{probe}]: {e}"))? {
+            Some(_) => break child.wait_with_output().map_err(|e| format!("curl 读取输出失败 [{service}.{probe}]: {e}"))?,
+            None => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    timed_out = true;
+                    break child.wait_with_output().map_err(|e| format!("curl 超时读取输出失败 [{service}.{probe}]: {e}"))?;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    };
+    if timed_out {
+        return Ok(serde_json::json!({
+            "ok": false,
+            "probe": probe,
+            "service": service,
+            "error": format!("curl 超时（{}ms）", timeout),
+        }));
+    }
+    let code = out.status.code().unwrap_or(-1);
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    if code != 0 {
+        return Ok(serde_json::json!({
+            "ok": false,
+            "probe": probe,
+            "service": service,
+            "error": format!("curl 退出 {} {}", code, combined.trim().chars().take(200).collect::<String>()),
+        }));
+    }
+    let raw_text = combined.trim().to_string();
+    // 先保存 curl 原始响应（clone，后面 jq 会 move 掉 parsed 里的值）
+    let raw_response = serde_json::from_str(&raw_text)
+        .unwrap_or(serde_json::json!({"_raw": raw_text}));
+    let parsed: Result<Value, _> = serde_json::from_str(&raw_text);
+    let mut raw: Value = match &parsed {
+        Ok(v) => v.clone(),
+        Err(_) => serde_json::json!({"_raw": raw_text}),
+    };
+    if !jq.is_empty() && jq != "." {
+        let parts: Vec<&str> = jq.split('.').filter(|s| !s.is_empty()).collect();
+        for part in parts {
+            raw = match &raw {
+                Value::Object(m) => m.get(part).cloned().unwrap_or(Value::Null),
+                Value::Array(a) if let Ok(idx) = part.parse::<usize>() => a.get(idx).cloned().unwrap_or(Value::Null),
+                _ => return Ok(serde_json::json!({"ok": false, "probe": probe, "service": service, "error": format!("jq 路径 .{part} 在结果中不存在"), "path": jq})),
+            };
+        }
+    }
+    // jq 结果之外，把 curl 原始响应也注入为 `raw_response`，
+    // 这样 assert 可以用 `len(raw_response.models) > 0` 引用原始结构。
+    // 同时保留 `result` 键，指向当前（已 jq 后的）值。
+    let mut scope: HashMap<String, Value> = HashMap::new();
+    scope.insert("raw_response".into(), raw_response);
+    scope.insert("result".into(), raw.clone());
+    apply_assert(service, probe, &raw, l3.assert.as_deref(), &scope)
+}
+
+fn run_probe_llm_echo(service: &str, probe: &str, l3: &crate::model::ProbeL3) -> Result<Value, String> {
+    let url = l3.url.as_ref()
+        .ok_or_else(|| format!("探针 {probe} 缺 url"))?;
+    let model = l3.model.as_ref()
+        .ok_or_else(|| format!("探针 {probe} 缺 model"))?;
+    let timeout_ms = l3.timeout_ms.max(1000);
+    let body = serde_json::json!({
+        "model": model,
+        "messages": [{"role": "user", "content": "ping"}],
+        "stream": false
+    });
+    let body_str = serde_json::to_string(&body).unwrap();
+    let timeout_cap = std::cmp::min(timeout_ms, 60_000);
+    // 直接用 Command 而非 run_blocking：避免 /dev/null 被追加为 curl 的最终参数
+    let mut command = std::process::Command::new("curl");
+    command.args(&[
+        "--silent",
+        "--max-time", &timeout_cap.to_string(),
+        "-X", "POST",
+        "-H", "Content-Type: application/json",
+        "-d", &body_str,
+        url,
+    ])
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::piped());
+    let mut child = command.spawn()
+        .map_err(|e| format!("curl 启动失败 [{service}.{probe}]: {e}"))?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis((timeout_cap + 1000).min(65_000));
+    let mut timed_out = false;
+    let out = loop {
+        match child.try_wait().map_err(|e| format!("curl 等待失败 [{service}.{probe}]: {e}"))? {
+            Some(_) => break child.wait_with_output().map_err(|e| format!("curl 读取输出失败 [{service}.{probe}]: {e}"))?,
+            None => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    timed_out = true;
+                    break child.wait_with_output().map_err(|e| format!("curl 超时读取输出失败 [{service}.{probe}]: {e}"))?;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    };
+    if timed_out {
+        return Ok(serde_json::json!({
+            "ok": false,
+            "probe": probe,
+            "service": service,
+            "error": format!("curl 超时（{}ms）", timeout_cap),
+        }));
+    }
+    let code = out.status.code().unwrap_or(-1);
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    if code != 0 {
+        return Ok(serde_json::json!({
+            "ok": false,
+            "probe": probe,
+            "service": service,
+            "error": format!("curl 退出 {} {}", code, combined.trim().chars().take(200).collect::<String>()),
+        }));
+    }
+    let resp: Value = serde_json::from_str(&combined)
+        .unwrap_or(serde_json::json!({}));
+    let done = resp.get("done").and_then(|v| v.as_bool()).unwrap_or(false);
+    let ms = resp.get("eval_duration_ms")
+        .or_else(|| resp.get("eval_duration"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(timeout_ms);
+    Ok(serde_json::json!({
+        "ok": done,
+        "probe": probe,
+        "service": service,
+        "model": model,
+        "ms": ms,
+        "done": done,
+    }))
+}
+
+fn run_probe_container(service: &str, probe: &str, l3: &crate::model::ProbeL3) -> Result<Value, String> {
+    let container = l3.container.as_ref()
+        .ok_or_else(|| format!("探针 {probe} 缺 container"))?;
+    let cmd = l3.exec.first()
+        .ok_or_else(|| format!("探针 {probe} 缺 exec 命令"))?;
+    let timeout = l3.timeout_ms.max(1);
+    let docker_args: Vec<&str> = vec![
+        "run", "--rm",
+        "--network", "none",
+        container,
+        "/bin/sh", "-c", cmd,
+    ];
+    let out = exec::run_blocking("docker", &docker_args, "/dev/null", ".", &HashMap::new(), timeout + 1000)
+        .map_err(|e| format!("docker exec 失败 [{service}.{probe}]: {e}"))?;
+    let v = parse_last_json(&out.combined)
+        .ok_or_else(|| format!("探针 {service}.{probe} 容器输出非 JSON: {}", out.combined.trim()))?;
+    apply_assert(service, probe, &v, l3.assert.as_deref(), &HashMap::new())
+}
+
+/// 若 l3.assert 存在，用 eval_expr 求值；通过返回原始结果，不通过返回 {ok:false, error}
+///
+/// 变量作用域（按优先级）：
+///   - `result` = jq 提取后的探针结果（始终可用）
+///   - `raw_response` = curl 原始响应（http_json 类型提供）
+///   - result 顶层字段展平（如 `models` / `results` / `ok`）也直接注入
+///   - extra_scope 由 caller 提供，http_json 注入 raw_response，其他探针传空 HashMap
+fn apply_assert(
+    service: &str,
+    probe: &str,
+    result: &Value,
+    assert: Option<&str>,
+    extra_scope: &HashMap<String, Value>,
+) -> Result<Value, String> {
+    match assert {
+        None => Ok(result.clone()),
+        Some(expr) => {
+            // 兼容 C 风格 &&/|| → Rust 风格的 and/or（manifest 常用 &&）
+            let normalized = expr
+                .replace("&&", " and ")
+                .replace("||", " or ");
+            // 合并作用域：extra_scope > result 顶层字段 > result
+            let mut scope = extra_scope.clone();
+            if let Value::Object(obj) = result {
+                for (k, v) in obj {
+                    scope.insert(k.clone(), v.clone());
+                }
+            }
+            scope.insert("result".into(), result.clone());
+            let ok = eval_expr(&normalized, &scope)
+                .map(|v| truthy(&v))
+                .map_err(|e| format!("assert 表达式求值失败 [{service}.{probe}]: {e}"))?;
+            if ok {
+                // 通过时包装为对象并注入 ok:true，确保 run_all_probes 能通过 v.get("ok") 读取状态
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "probe": probe,
+                    "service": service,
+                    "result": result,
+                }))
+            } else {
+                Ok(serde_json::json!({
+                    "ok": false,
+                    "probe": probe,
+                    "service": service,
+                    "error": format!("assert 失败: {expr}"),
+                    "result": result,
+                }))
+            }
+        }
+    }
 }
 
 fn parse_last_json(s: &str) -> Option<Value> {

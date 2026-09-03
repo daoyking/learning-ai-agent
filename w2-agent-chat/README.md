@@ -70,6 +70,40 @@ npm run eval    # 真实 LLM 评测：跑真实 Agent 并写出 eval-report.md�
 `evals/agent.ts` 复用本工程真实的 `tools` + `createModel()`，把对话跑成无头 `AgentRun` 交给评测；
 `evals/run.ts` 调用 W5 的 `runEval(llmJudge, agent, dataset)`，评分逻辑与 W5 完全一致（评测即回归）。
 
+### 实测结果（2026-09-02，`qwen3:14b`）
+
+**通过率 100% · 加权均分 9.8/10** —— 详见 [docs/eval-v1-first-run.md](./docs/eval-v1-first-run.md)。
+
+| 用例 | 得分 | 工具调用 |
+|---|---|---|
+| `w2-calc-1` 计算 `12 * (3 + 4)` | 10 ✅ | calculator |
+| `w2-weather-1` 北京天气 | 10 ✅ | getWeather |
+| `w2-readfile-1` 读文档总结 | 9.4 ✅ | readFile |
+
+这是本工程 eval **首次真正跑通**。此前有三处缺陷叠加，导致它连一次都没成功过：
+
+1. **`.env` 从未被加载** —— `dotenv/config` 只写在 `server/index.ts`（`npm start` 入口），
+   而 `npm run eval` 走 `evals/run.ts`，整条链路读不到环境变量，`AI_MODEL` 为 `undefined`。
+2. **`AI_MODEL` 有 `'gpt-4o-mini'` fallback** —— 把上一条伪装成「模型不好用 / key 不对」，
+   实际是拿着 `apiKey='missing'` 去打 OpenAI 官方端点，必然 401。
+3. **`evals/agent.ts` 用了 `maxSteps: 5`** —— 那是 AI SDK v4 的写法，v5+ 已改为 `stopWhen`，
+   且因为 `evals` 不在 `tsconfig.include` 里，**这个类型错误一直没被抓到**。
+
+修法：dotenv 下沉到 `server/model.ts`（共享模块，任何入口都会加载）、去掉 fallback 改为缺失即报错、
+`maxSteps` → `stopWhen: stepCountIs(5)`、`tsconfig.include` 补上 `evals`。
+
+> ⚠️ **模型必须支持 `tool_calls`**：本工程的 eval 标准大量依赖「是否调用了某工具」。
+> `qwen2.5-coder:14b` 在 Ollama 的 OpenAI 兼容端点下不产生 `tool_calls`（只把调用写成 JSON 文本），
+> 会导致全线崩塌。换模型后先跑 `npm run eval` 确认，详见 W5 的 [docs/ITERATION.md](../w5-agent-eval/docs/ITERATION.md)。
+
+### 兜底逻辑是可观测的
+
+`evals/agent.ts` 里保留了一段兜底：模型工具调用后没产出文本时，用工具结果再合成一次答案。
+它**只在文本几乎为空时触发，且会打印 `⚠️` 告警**。正常流程下（多步循环正常）不该出现这行日志 ——
+一旦频繁出现，说明 `stopWhen` 没生效，要去排查而不是靠兜底掩盖。
+
+本次运行**零告警**，说明模型自己跑完了循环。
+
 
 ## 长期记忆（agentmemory）
 
