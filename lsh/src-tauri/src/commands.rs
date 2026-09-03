@@ -612,6 +612,12 @@ pub fn run_l2_probe(service_id: String) -> Result<serde_json::Value, String> {
     crate::pb::run_l2_probe(&service_id, m)
 }
 
+/// 运行所有服务的 L2 HTTP 探针，返回映射表。
+#[tauri::command]
+pub fn run_all_l2_probes() -> Result<Vec<(String, serde_json::Value)>, String> {
+    crate::pb::run_all_l2_probes()
+}
+
 // ───────────────────────────── 日志中心（V0.2：聚合尾部 + 旋转） ─────────────────────────────
 
 #[tauri::command]

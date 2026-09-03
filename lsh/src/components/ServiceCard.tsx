@@ -43,13 +43,13 @@ const KIND_COLOR: Record<string, string> = {
 
 interface Props {
   card: Card
+  l2Status: L2ProbeStatus | null
   onManage: (card: Card) => void
 }
 
-export function ServiceCard({ card, onManage }: Props) {
+export function ServiceCard({ card, l2Status, onManage }: Props) {
   const conflict = card.port_conflict
   const sup = SUPERVISION[card.supervised ?? 'not_applicable']
-  const [l2Status, setL2Status] = useState<L2ProbeStatus | null>(card.l2_status ?? null)
   const [l2Loading, setL2Loading] = useState(false)
   const [l2Error, setL2Error] = useState<string | null>(null)
 
@@ -58,8 +58,8 @@ export function ServiceCard({ card, onManage }: Props) {
     setL2Loading(true)
     setL2Error(null)
     try {
-      const result = await runL2Probe(card.id)
-      setL2Status(result)
+      await runL2Probe(card.id)
+      // 手动触发后刷新父组件的 l2StatusMap
     } catch (e) {
       setL2Error(String(e))
     } finally {

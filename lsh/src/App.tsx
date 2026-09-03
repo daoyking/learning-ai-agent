@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { scanServices, previewAction, runAction } from './lib/api'
+import { scanServices, previewAction, runAction, runAllL2Probes } from './lib/api'
 import { ServiceCard } from './components/ServiceCard'
 import { PlaybookPanel } from './components/PlaybookPanel'
 import { LogPanel } from './components/LogPanel'
 import { DoctorPanel } from './components/DoctorPanel'
 import type {
   ActionPreview,
+  L2ProbeStatus,
   RunActionResult,
   ScanResult,
   ServiceCard as Card,
@@ -60,6 +61,8 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [manage, setManage] = useState<ManageState | null>(null)
   const [view, setView] = useState<'services' | 'playbooks' | 'logs' | 'doctor'>('services')
+  const [l2StatusMap, setL2StatusMap] = useState<Record<string, L2ProbeStatus>>({})
+  const [l2Loading, setL2Loading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -74,9 +77,30 @@ export default function App() {
     }
   }, [])
 
+  /** 扫描完成后异步预检所有 L2 探针 */
+  const runL2Scan = useCallback(async () => {
+    if (!data || data.services.length === 0) return
+    setL2Loading(true)
+    try {
+      const l2Map = await runAllL2Probes()
+      setL2StatusMap(l2Map)
+    } catch (e) {
+      console.error('L2 自动扫描失败:', e)
+    } finally {
+      setL2Loading(false)
+    }
+  }, [data])
+
   useEffect(() => {
     void load()
   }, [load])
+
+  /** 扫描完成后触发 L2 自动扫描 */
+  useEffect(() => {
+    if (data && !l2Loading) {
+      void runL2Scan()
+    }
+  }, [data, runL2Scan, l2Loading])
 
   const grouped = useMemo(() => {
     const map = new Map<string, Card[]>()
@@ -237,7 +261,7 @@ export default function App() {
             </h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
               {cards.map((card) => (
-                <ServiceCard key={card.id} card={card} onManage={openManage} />
+                <ServiceCard key={card.id} card={card} l2Status={l2StatusMap[card.id]} onManage={openManage} />
               ))}
             </div>
           </section>

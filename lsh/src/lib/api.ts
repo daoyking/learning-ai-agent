@@ -173,3 +173,16 @@ export async function runL2Probe(serviceId: string): Promise<L2ProbeStatus> {
   }
   return invoke<L2ProbeStatus>('run_l2_probe', { serviceId })
 }
+
+/** 运行所有服务的 L2 HTTP 探针，返回 {serviceId: L2ProbeStatus} 映射 */
+export async function runAllL2Probes(): Promise<Record<string, L2ProbeStatus>> {
+  if (!isTauri()) {
+    return {}
+  }
+  const pairs = await invoke<Array<[string, L2ProbeStatus]>>('run_all_l2_probes')
+  const result: Record<string, L2ProbeStatus> = {}
+  for (const [serviceId, status] of pairs) {
+    result[serviceId] = status
+  }
+  return result
+}

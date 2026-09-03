@@ -850,6 +850,28 @@ pub fn run_all_probes() -> Result<Vec<ProbeRun>, String> {
     Ok(out)
 }
 
+/// 运行所有服务的 L2 HTTP 探针，返回每个服务的 L2 状态映射。
+pub fn run_all_l2_probes() -> Result<Vec<(String, Value)>, String> {
+    let manifests = registry::load_manifests()?;
+    let mut out = Vec::new();
+    for m in &manifests {
+        if m.health.l2.is_some() {
+            match run_l2_probe(&m.id, m) {
+                Ok(v) => out.push((m.id.clone(), v)),
+                Err(e) => {
+                    out.push((m.id.clone(), serde_json::json!({
+                        "ok": false,
+                        "error": e,
+                        "status": 0,
+                        "ms": 0,
+                    })));
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
 fn flatten_top(obj: &Value) -> HashMap<String, Value> {
     let mut m = HashMap::new();
     if let Value::Object(o) = obj {
