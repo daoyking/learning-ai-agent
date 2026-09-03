@@ -118,7 +118,7 @@ export function ServiceCard({ card, onManage }: Props) {
       )}
 
       {/* L2 HTTP 探针结果 */}
-      {card.l3_count === 0 && (
+      {card.port != null && (
         <div className="flex items-center justify-between rounded border border-ink-700 bg-ink-900/50 px-2 py-1.5">
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-slate-500">L2 HTTP 探针</span>
