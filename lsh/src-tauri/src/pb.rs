@@ -511,8 +511,10 @@ fn run_probe_http_json(service: &str, probe: &str, l3: &crate::model::ProbeL3) -
     }
     // 直接用 Command 而非 run_blocking：run_blocking 会把 cmd 参数追加到 base_args 后面，
     // 而我们这里需要精确控制参数顺序，URL 必须是最后一个位置参数。
+    // 同时注入 NO_PROXY 避免沙箱代理劫持本地请求。
     let mut command = std::process::Command::new("curl");
-    command.args(&args.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+    command.env("NO_PROXY", "127.0.0.1,localhost")
+        .args(&args.iter().map(|s| s.as_str()).collect::<Vec<_>>())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     let mut child = command.spawn()
@@ -597,7 +599,9 @@ fn run_probe_llm_echo(service: &str, probe: &str, l3: &crate::model::ProbeL3) ->
     let body_str = serde_json::to_string(&body).unwrap();
     let timeout_cap = std::cmp::min(timeout_ms, 60_000);
     // 直接用 Command 而非 run_blocking：避免 /dev/null 被追加为 curl 的最终参数
+    // 同时注入 NO_PROXY 避免沙箱代理劫持本地请求
     let mut command = std::process::Command::new("curl");
+    command.env("NO_PROXY", "127.0.0.1,localhost");
     command.args(&[
         "--silent",
         "--max-time", &timeout_cap.to_string(),
