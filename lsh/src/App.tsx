@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { scanServices, previewAction, runAction, runAllL2Probes } from './lib/api'
 import { ServiceCard } from './components/ServiceCard'
 import { PlaybookPanel } from './components/PlaybookPanel'
@@ -63,6 +63,8 @@ export default function App() {
   const [view, setView] = useState<'services' | 'playbooks' | 'logs' | 'doctor'>('services')
   const [l2StatusMap, setL2StatusMap] = useState<Record<string, L2ProbeStatus>>({})
   const [l2Loading, setL2Loading] = useState(false)
+  /** 记录已跑过 L2 自动扫描的那份 data，避免 effect 因 l2Loading 变化而重复触发 */
+  const l2ScannedFor = useRef<ScanResult | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -95,12 +97,18 @@ export default function App() {
     void load()
   }, [load])
 
-  /** 扫描完成后触发 L2 自动扫描 */
+  /** 扫描完成后触发 L2 自动扫描（每份 data 只跑一次） */
   useEffect(() => {
-    if (data && !l2Loading) {
-      void runL2Scan()
-    }
-  }, [data, runL2Scan, l2Loading])
+    if (!data || data.services.length === 0) return
+    if (l2ScannedFor.current === data) return
+    l2ScannedFor.current = data
+    void runL2Scan()
+  }, [data, runL2Scan])
+
+  /** 卡片手动「检测」后回填结果到状态表 */
+  const handleL2Result = useCallback((id: string, status: L2ProbeStatus) => {
+    setL2StatusMap((prev) => ({ ...prev, [id]: status }))
+  }, [])
 
   const grouped = useMemo(() => {
     const map = new Map<string, Card[]>()
@@ -139,6 +147,16 @@ export default function App() {
       ).length,
     }
   }, [data])
+
+  /** L2 HTTP 探针汇总：区分"还没跑"和"跑了但失败" */
+  const l2Stats = useMemo(() => {
+    const values = Object.values(l2StatusMap)
+    return {
+      total: values.length,
+      ok: values.filter((v) => v.ok).length,
+      fail: values.filter((v) => !v.ok).length,
+    }
+  }, [l2StatusMap])
 
   const openManage = useCallback((card: Card) => {
     setManage({ card, preview: null, result: null, loading: false, error: null })
@@ -215,6 +233,15 @@ export default function App() {
             {stats.unsupervised > 0 && (
               <span className="text-amber-400"> · {stats.unsupervised} 在线但无守护</span>
             )}
+            {l2Stats.total > 0 && (
+              <span className="text-slate-400">
+                {' '}
+                · L2 {l2Stats.ok}/{l2Stats.total} 通
+                {l2Stats.fail > 0 && (
+                  <span className="text-rose-400"> · {l2Stats.fail} 不通</span>
+                )}
+              </span>
+            )}
           </span>
         </div>
 
@@ -223,6 +250,9 @@ export default function App() {
             <span className="chip bg-ink-700 text-slate-400" title="数据来自 scripts/snapshot.mjs 生成的本机快照">
               快照模式
             </span>
+          )}
+          {l2Loading && (
+            <span className="chip bg-ink-700 text-slate-400">L2 探测中…</span>
           )}
           {data && (
             <span className="font-mono text-[10px] text-slate-600">
@@ -245,11 +275,12 @@ export default function App() {
         </div>
       )}
 
-      {/* V0.2 能力声明：L1 + 真实启停已落地 */}
+      {/* V0.7 能力声明：L1 端口 + L2 HTTP 真实探测 + 真实启停 */}
       <div className="mx-5 mt-3 rounded border border-status-degraded/30 bg-status-degraded/[0.07] px-3 py-2 text-[11px] leading-relaxed text-slate-400">
-        <b className="text-status-degraded">V0.2：L1 判定 + 真实启停。</b>
-        点卡片「管理」可预览并真实执行启停动作（按 manifest 的 danger 等级做二次确认 / 提权隔离）。
-        绿色只代表端口在监听，<b>不代表服务真的能用</b> —— L2/L3 语义探针在 V0.3 接入。
+        <b className="text-status-degraded">V0.7：L1 端口 + L2 HTTP 探测 + 真实启停。</b>
+        启动后自动对所有服务跑 L2 探针（真实 curl 请求，不是猜的），卡片上的{' '}
+        <b>✓ :200</b> 才是「HTTP 真的应答了」；<b>✗ :0</b> 表示连接失败。
+        卡片「检测」可单服务复测。L1/L2 绿但 L3 红 = 假活，L3 语义探针尚未接入。
       </div>
 
       <main className="flex-1 overflow-y-auto px-5 py-4">
@@ -261,7 +292,13 @@ export default function App() {
             </h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
               {cards.map((card) => (
-                <ServiceCard key={card.id} card={card} l2Status={l2StatusMap[card.id]} onManage={openManage} />
+                <ServiceCard
+                  key={card.id}
+                  card={card}
+                  l2Status={l2StatusMap[card.id]}
+                  onManage={openManage}
+                  onL2Result={handleL2Result}
+                />
               ))}
             </div>
           </section>

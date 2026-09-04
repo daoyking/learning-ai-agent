@@ -45,9 +45,10 @@ interface Props {
   card: Card
   l2Status: L2ProbeStatus | null
   onManage: (card: Card) => void
+  onL2Result: (id: string, status: L2ProbeStatus) => void
 }
 
-export function ServiceCard({ card, l2Status, onManage }: Props) {
+export function ServiceCard({ card, l2Status, onManage, onL2Result }: Props) {
   const conflict = card.port_conflict
   const sup = SUPERVISION[card.supervised ?? 'not_applicable']
   const [l2Loading, setL2Loading] = useState(false)
@@ -58,8 +59,8 @@ export function ServiceCard({ card, l2Status, onManage }: Props) {
     setL2Loading(true)
     setL2Error(null)
     try {
-      await runL2Probe(card.id)
-      // 手动触发后刷新父组件的 l2StatusMap
+      const result = await runL2Probe(card.id)
+      onL2Result(card.id, result)
     } catch (e) {
       setL2Error(String(e))
     } finally {
