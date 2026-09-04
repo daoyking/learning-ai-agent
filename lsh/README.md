@@ -156,9 +156,12 @@ trigger（可观测症状） → diagnose（只读取证） → conclude（带�
 ### 🚧 待办
 
 - [x] L2 HTTP 探针（V0.6）—— 手动触发 HTTP 健康检查，显示状态码+耗时
+- [x] L2 自动扫描（V0.7）—— 启动时异步预检全部服务，头部汇总 L2 x/9 通
+- [x] L2 无限循环修复 —— useEffect 移除 l2Loading 依赖，改用 useRef 幂等守卫
 - [ ] openclaw gateway 实际运行验证
 - [ ] AnythingLLM API key 配置接入
 - [ ] ChromaDB 0.6.x API bug 跟踪（降级报告已处理）
+- [ ] L3 语义探针接入 UI（引擎已就绪，尚未在卡片展示）
 
 ---
 
