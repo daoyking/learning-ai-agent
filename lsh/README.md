@@ -92,6 +92,30 @@ job 已注册 → `launchctl kickstart`（内部自带 pty）；
 未注册 → 自己用 `script -q` 包一层 + setsid 脱离进程组。
 只有需要**交互式写入**（发 Ctrl-C、应答 prompt）时才升级到 `portable-pty`。
 
+### 受管 shell 里启动服务的存活问题（2026-09-04 实测）
+
+在 AI Agent / CI 这类**受管 shell** 里启服务，进程会随 shell 会话被回收 —— 日志里
+没有任何报错，只是到某一行戛然而止，极易误判为"服务崩溃了"。实测结论：
+
+| 启动方式 | 是否存活 | 说明 |
+|---|---|---|
+| `nohup cmd &` | ❌ | 同进程组，会话结束即被回收 |
+| `nohup script -q log cmd &` | ⚠️ | 能活，但**加 `< /dev/null` 会让 script 读到 EOF 退出** |
+| `python3 os.fork() + os.setsid()` | ✅ | 新会话，与调用方完全脱离 |
+
+> `setsid` 在 macOS 上不存在，用 Python 的 `os.setsid()`（或 `subprocess` 的
+> `start_new_session=True`）是等价且零依赖的做法。
+
+### launchctl bootstrap 在受管 shell 里不可用
+
+`launchctl bootstrap gui/$UID <plist>` 会稳定报 **`Bootstrap failed: 5: Input/output error`**，
+且**与 plist 内容无关** —— 用最小化合法 plist 验证同样失败。原因是调用进程不在用户的
+Aqua GUI 会话里，拿不到 gui domain 的 bootstrap 权限（读操作如 `launchctl print` /
+`print-disabled` 都正常，只有写操作失败）。
+
+**含义**：LSH 的「注册 / 启动」动作必须由 GUI 上下文发起 —— 也就是 LSH 应用自己的窗口，
+或 Terminal.app。这也是为什么不能靠脚本批量注册 job。
+
 ---
 
 ## 三级健康探针：判据只有一条
@@ -158,10 +182,11 @@ trigger（可观测症状） → diagnose（只读取证） → conclude（带�
 - [x] L2 HTTP 探针（V0.6）—— 手动触发 HTTP 健康检查，显示状态码+耗时
 - [x] L2 自动扫描（V0.7）—— 启动时异步预检全部服务，头部汇总 L2 x/9 通
 - [x] L2 无限循环修复 —— useEffect 移除 l2Loading 依赖，改用 useRef 幂等守卫
-- [ ] openclaw gateway 实际运行验证
+- [x] **openclaw gateway 实际运行验证**（2026-09-04：18789 /health → 200，webchat WS 正常）
 - [ ] AnythingLLM API key 配置接入
 - [ ] ChromaDB 0.6.x API bug 跟踪（降级报告已处理）
 - [ ] L3 语义探针接入 UI（引擎已就绪，尚未在卡片展示）
+- [ ] launchd 注册：openclaw / dsh 两个 job 仍未加载（需从 LSH 窗口或 Terminal.app 手动 bootstrap）
 
 ---
 
