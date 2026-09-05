@@ -7,6 +7,7 @@ import type {
 } from '../types'
 import { StatusDot, statusLabel } from './StatusDot'
 import { runL2Probe, runServiceL3Probes } from '../lib/api'
+import { formatAge } from '../lib/l3Store'
 import { useEffect, useRef, useState } from 'react'
 
 const SUPERVISION: Record<
@@ -282,6 +283,10 @@ export function ServiceCard({
                   )}
                 </div>
               ))}
+              <div className="border-t border-ink-700/60 pt-1 text-[10px] text-slate-600">
+                检测于 {new Date(l3Summary.at).toLocaleString('zh-CN')}（
+                {formatAge(l3Summary.at)}）· 合计 {l3Summary.ms}ms
+              </div>
             </div>
           )}
         </div>

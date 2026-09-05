@@ -6,6 +6,7 @@ import {
   runAllL2Probes,
   runAllL3Probes,
 } from './lib/api'
+import { L3_STALE_MS, clearL3, formatAge, loadL3, saveL3 } from './lib/l3Store'
 import { ServiceCard } from './components/ServiceCard'
 import { PlaybookPanel } from './components/PlaybookPanel'
 import { LogPanel } from './components/LogPanel'
@@ -73,7 +74,8 @@ export default function App() {
   /** 记录已跑过 L2 自动扫描的那份 data，避免 effect 因 l2Loading 变化而重复触发 */
   const l2ScannedFor = useRef<ScanResult | null>(null)
   // L3 语义探针结果。刻意不在启动时自动跑：L3 会真发请求（ollama 跑一次推理、
-  // openclaw 冷启动 CLI 体检 60s+），全量 30–90s，开机即跑太重。
+  // openclaw 冷启动 CLI 体检 60s+），全量约 122s，开机即跑太重。
+  // 改为从 localStorage 恢复上次结果（带时间戳，过期会标琥珀色），需要时手动重跑。
   const [l3Map, setL3Map] = useState<Record<string, L3Summary>>({})
   const [l3Loading, setL3Loading] = useState(false)
   const [l3Elapsed, setL3Elapsed] = useState(0)
@@ -110,6 +112,35 @@ export default function App() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /** 启动时恢复上次 L3 结果（省掉 122s 重跑）。每条自带 at，过期会被标琥珀色 */
+  useEffect(() => {
+    const cached = loadL3()
+    if (cached) setL3Map(cached)
+  }, [])
+
+  /** L3 结果落盘 */
+  useEffect(() => {
+    if (Object.keys(l3Map).length > 0) saveL3(l3Map)
+  }, [l3Map])
+
+  /**
+   * 扫描结果出来后，剔除已不存在于 manifest 的缓存条目。
+   *
+   * 否则删掉某个服务的 manifest 后，它的旧 L3 结果还会留在缓存里，
+   * 继续被算进顶部「L3 x/y 通」的聚合数字 —— 那个数字就成了错的。
+   */
+  useEffect(() => {
+    if (!data) return
+    const known = new Set(data.services.map((s) => s.id))
+    setL3Map((prev) => {
+      const kept = Object.keys(prev).filter((id) => known.has(id))
+      if (kept.length === Object.keys(prev).length) return prev
+      const next: Record<string, L3Summary> = {}
+      for (const id of kept) next[id] = prev[id]
+      return next
+    })
+  }, [data])
 
   /** 扫描完成后触发 L2 自动扫描（每份 data 只跑一次） */
   useEffect(() => {
@@ -207,16 +238,42 @@ export default function App() {
     }
   }, [l2StatusMap])
 
-  /** L3 语义探针汇总：探针通过数 + 存在假活（有探针没过）的服务数 */
+  /**
+   * 每分钟推进一次的「当前时间」。
+   *
+   * 没有它的话，L3 结果的年龄只会停在渲染那一刻 —— 窗口开上两小时，
+   * 界面还写着「5 分钟前」，过期标记就成了摆设。
+   */
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  /**
+   * L3 语义探针汇总：探针通过数 + 存在假活（有探针没过）的服务数。
+   *
+   * 年龄取**最老**那条而不是最新：聚合结论的可信度由最陈旧的那份数据决定。
+   */
   const l3Stats = useMemo(() => {
     const values = Object.values(l3Map)
+    const oldest =
+      values.length > 0 ? Math.min(...values.map((s) => s.at)) : null
     return {
       services: values.length,
       pass: values.reduce((n, s) => n + s.pass, 0),
       total: values.reduce((n, s) => n + s.total, 0),
       fakeAlive: values.filter((s) => !s.ok).length,
+      at: oldest,
+      stale: oldest !== null && now - oldest > L3_STALE_MS,
     }
-  }, [l3Map])
+  }, [l3Map, now])
+
+  /** 清空缓存的 L3 结果（结果太旧、不想被误导时用） */
+  const clearL3Cache = useCallback(() => {
+    clearL3()
+    setL3Map({})
+  }, [])
 
   const openManage = useCallback((card: Card) => {
     setManage({ card, preview: null, result: null, loading: false, error: null })
@@ -312,6 +369,20 @@ export default function App() {
                     · {l3Stats.fakeAlive} 个服务假活
                   </span>
                 )}
+                {l3Stats.at !== null && (
+                  <span
+                    className={l3Stats.stale ? 'text-amber-400' : 'text-slate-600'}
+                    title={
+                      l3Stats.stale
+                        ? `结果已超过 ${L3_STALE_MS / 60000} 分钟，服务状态可能已变化，建议重跑`
+                        : '取所有服务中最老的那次检测时间'
+                    }
+                  >
+                    {' '}
+                    · {formatAge(l3Stats.at, now)}
+                    {l3Stats.stale && ' 已过期'}
+                  </span>
+                )}
               </span>
             )}
           </span>
@@ -339,11 +410,20 @@ export default function App() {
           <button
             onClick={() => void runL3Scan()}
             disabled={l3Loading}
-            title="L3 语义探针会真实发起请求：ollama 跑一次推理、searxng 真搜一次、openclaw 冷启动 CLI 做插件体检。全量约 30–90 秒，因此不随启动自动跑。"
+            title="L3 语义探针会真实发起请求：ollama 跑一次推理、searxng 真搜一次、openclaw 冷启动 CLI 做插件体检。全量约 2 分钟，因此不随启动自动跑，结果会缓存在本地供下次打开直接查看。"
             className="rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-300 transition-colors hover:border-amber-400 hover:text-amber-200 disabled:opacity-50"
           >
             {l3Loading ? `L3 深检中 ${(l3Elapsed / 1000).toFixed(0)}s` : 'L3 深度体检'}
           </button>
+          {!l3Loading && l3Stats.total > 0 && (
+            <button
+              onClick={clearL3Cache}
+              title="清除缓存的 L3 结果。结果太旧、不想被误导时用"
+              className="rounded border border-ink-600 px-2 py-1 text-[11px] text-slate-500 transition-colors hover:border-slate-500 hover:text-slate-300"
+            >
+              清除缓存
+            </button>
+          )}
           <button
             onClick={() => void load()}
             disabled={loading}

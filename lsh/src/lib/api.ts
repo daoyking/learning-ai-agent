@@ -200,6 +200,7 @@ export async function runProbes(): Promise<ProbeRun[]> {
  * 只有真正发一次请求、拿到正确结果才算通过。
  */
 export function summarizeL3(runs: ProbeRun[]): Record<string, L3Summary> {
+  const at = Date.now()
   const result: Record<string, L3Summary> = {}
   for (const run of runs) {
     const summary = (result[run.service] ??= {
@@ -208,6 +209,7 @@ export function summarizeL3(runs: ProbeRun[]): Record<string, L3Summary> {
       ok: true,
       runs: [],
       ms: 0,
+      at,
     })
     summary.total += 1
     if (run.ok) summary.pass += 1

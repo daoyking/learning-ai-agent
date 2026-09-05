@@ -69,6 +69,13 @@ export interface L3Summary {
   runs: ProbeRun[]
   /** 服务整体耗时（所有探针 ms 之和，缺失时记 0） */
   ms: number
+  /**
+   * 这份结果的产生时刻（Date.now()）。
+   *
+   * L3 结果会被持久化复用，但对健康监控来说「多久之前测的」和「测得怎么样」
+   * 同样重要 —— 两小时前的绿灯不能当成现在的绿灯。
+   */
+  at: number
 }
 
 export interface ServiceCard {
