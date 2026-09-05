@@ -1,7 +1,13 @@
-import type { ServiceCard as Card, L2ProbeStatus, SupervisionState } from '../types'
+import type {
+  ServiceCard as Card,
+  L2ProbeStatus,
+  L3Summary,
+  ProbeRun,
+  SupervisionState,
+} from '../types'
 import { StatusDot, statusLabel } from './StatusDot'
-import { runL2Probe } from '../lib/api'
-import { useState } from 'react'
+import { runL2Probe, runServiceL3Probes } from '../lib/api'
+import { useEffect, useRef, useState } from 'react'
 
 const SUPERVISION: Record<
   SupervisionState,
@@ -41,18 +47,63 @@ const KIND_COLOR: Record<string, string> = {
   pty: '#F472B6',
 }
 
+/**
+ * 从探针结果里抽出人话失败原因。
+ *
+ * 探针输出形状不统一：assert 过的会被 apply_assert 包一层 {ok, result}，
+ * 原始脚本的输出又直接摊平在顶层，所以 error / reason / hint 都要找一遍。
+ */
+function l3Reason(run: ProbeRun): string {
+  const read = (o: unknown): string | null => {
+    if (!o || typeof o !== 'object') return null
+    const rec = o as Record<string, unknown>
+    for (const key of ['error', 'reason', 'hint']) {
+      const v = rec[key]
+      if (typeof v === 'string' && v.trim()) return v.trim()
+    }
+    return null
+  }
+  const vars = run.vars
+  const nested =
+    vars && typeof vars === 'object'
+      ? (vars as Record<string, unknown>).result
+      : null
+  return read(vars) ?? read(nested) ?? run.raw.slice(0, 160)
+}
+
 interface Props {
   card: Card
   l2Status: L2ProbeStatus | null
+  l3Summary: L3Summary | null
   onManage: (card: Card) => void
   onL2Result: (id: string, status: L2ProbeStatus) => void
+  onL3Result: (id: string, summary: L3Summary) => void
 }
 
-export function ServiceCard({ card, l2Status, onManage, onL2Result }: Props) {
+export function ServiceCard({
+  card,
+  l2Status,
+  l3Summary,
+  onManage,
+  onL2Result,
+  onL3Result,
+}: Props) {
   const conflict = card.port_conflict
   const sup = SUPERVISION[card.supervised ?? 'not_applicable']
   const [l2Loading, setL2Loading] = useState(false)
   const [l2Error, setL2Error] = useState<string | null>(null)
+  const [l3Loading, setL3Loading] = useState(false)
+  const [l3Error, setL3Error] = useState<string | null>(null)
+  const [l3Open, setL3Open] = useState(false)
+  const [l3Elapsed, setL3Elapsed] = useState(0)
+  const l3Timer = useRef<number | null>(null)
+
+  useEffect(
+    () => () => {
+      if (l3Timer.current !== null) window.clearInterval(l3Timer.current)
+    },
+    []
+  )
 
   const handleL2Probe = async () => {
     if (!card.id) return
@@ -65,6 +116,31 @@ export function ServiceCard({ card, l2Status, onManage, onL2Result }: Props) {
       setL2Error(String(e))
     } finally {
       setL2Loading(false)
+    }
+  }
+
+  /** 单服务深检：openclaw 这类能跑 60s+，所以带秒表 */
+  const handleL3Probe = async () => {
+    if (!card.id) return
+    setL3Loading(true)
+    setL3Error(null)
+    setL3Elapsed(0)
+    const startedAt = Date.now()
+    l3Timer.current = window.setInterval(() => {
+      setL3Elapsed(Date.now() - startedAt)
+    }, 500)
+    try {
+      const summary = await runServiceL3Probes(card.id)
+      if (summary) onL3Result(card.id, summary)
+      setL3Open(true)
+    } catch (e) {
+      setL3Error(String(e))
+    } finally {
+      if (l3Timer.current !== null) {
+        window.clearInterval(l3Timer.current)
+        l3Timer.current = null
+      }
+      setL3Loading(false)
     }
   }
 
@@ -139,6 +215,75 @@ export function ServiceCard({ card, l2Status, onManage, onL2Result }: Props) {
           >
             {l2Loading ? '检测中…' : '检测'}
           </button>
+        </div>
+      )}
+
+      {/* L3 语义探针 —— 唯一能证明「服务真的能用」的一层 */}
+      {card.l3_count > 0 && (
+        <div className="rounded border border-ink-700 bg-ink-900/50">
+          <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0 text-[10px] text-slate-500">L3 语义</span>
+              {l3Summary ? (
+                <button
+                  onClick={() => setL3Open((v) => !v)}
+                  className="flex min-w-0 items-center gap-1.5 text-[10px] hover:opacity-80"
+                  title="展开查看每个探针在验什么"
+                >
+                  <span
+                    className={
+                      l3Summary.ok ? 'text-emerald-400' : 'text-amber-400'
+                    }
+                  >
+                    {l3Summary.ok ? '✓' : '⚠'} {l3Summary.pass}/{l3Summary.total}
+                  </span>
+                  <span className="text-slate-600">{l3Summary.ms}ms</span>
+                  <span className="text-slate-600">{l3Open ? '▴' : '▾'}</span>
+                </button>
+              ) : (
+                <span className="text-[10px] text-slate-600">未检测</span>
+              )}
+              {l3Error && (
+                <span className="truncate text-[10px] text-rose-400" title={l3Error}>
+                  {l3Error}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleL3Probe}
+              disabled={l3Loading}
+              className="shrink-0 rounded border border-ink-600 px-2 py-0.5 text-[10px] text-slate-400 transition-colors hover:border-amber-500/60 hover:text-amber-300 disabled:opacity-40"
+              title="只跑这个服务的语义探针（真发请求，openclaw 约 60s）"
+            >
+              {l3Loading ? `深检 ${(l3Elapsed / 1000).toFixed(0)}s` : '深检'}
+            </button>
+          </div>
+
+          {l3Open && l3Summary && (
+            <div className="space-y-1.5 border-t border-ink-700 px-2 py-1.5">
+              {l3Summary.runs.map((run) => (
+                <div key={run.probe} className="text-[10px] leading-relaxed">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={run.ok ? 'text-emerald-400' : 'text-rose-400'}
+                    >
+                      {run.ok ? '✓' : '✗'}
+                    </span>
+                    <span className="font-mono text-slate-400">{run.probe}</span>
+                    <span className="text-slate-600">{run.ms}ms</span>
+                  </div>
+                  {run.desc && (
+                    <div className="pl-4 text-slate-500">{run.desc}</div>
+                  )}
+                  {!run.ok && (
+                    <div className="break-words pl-4 text-rose-300/80">
+                      {l3Reason(run)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

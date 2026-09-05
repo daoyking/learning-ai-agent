@@ -360,9 +360,17 @@ pub struct DiagnoseResult {
 pub struct ProbeRun {
     pub service: String,
     pub probe: String,
+    /// manifest 里声明的人类可读描述（可选），供 UI 展示探针在验什么
+    pub desc: Option<String>,
     pub ok: bool,
     pub raw: String,
     pub vars: Value,
+    /// 墙钟耗时（ms），由 run_all_probes 在调用侧统一测量。
+    ///
+    /// 不能依赖探针自报的 ms：llm_echo 曾把 Ollama 的纳秒当毫秒用，
+    /// script 探针的 ms 又被 apply_assert 塞进 result 里取不到。
+    /// 在调用侧计时对四种探针类型一视同仁，也不会错。
+    pub ms: u64,
 }
 
 // ───────────────────────────── 加载器 ─────────────────────────────
@@ -590,6 +598,7 @@ fn run_probe_llm_echo(service: &str, probe: &str, l3: &crate::model::ProbeL3) ->
         .ok_or_else(|| format!("探针 {probe} 缺 url"))?;
     let model = l3.model.as_ref()
         .ok_or_else(|| format!("探针 {probe} 缺 model"))?;
+    let started = std::time::Instant::now();
     let timeout_ms = l3.timeout_ms.max(1000);
     let body = serde_json::json!({
         "model": model,
@@ -655,16 +664,30 @@ fn run_probe_llm_echo(service: &str, probe: &str, l3: &crate::model::ProbeL3) ->
     let resp: Value = serde_json::from_str(&combined)
         .unwrap_or(serde_json::json!({}));
     let done = resp.get("done").and_then(|v| v.as_bool()).unwrap_or(false);
-    let ms = resp.get("eval_duration_ms")
-        .or_else(|| resp.get("eval_duration"))
+    // 注意单位：Ollama 的 eval_duration / total_duration 是**纳秒**，
+    // 而它并不返回 eval_duration_ms —— 早期版本直接 as_u64() 当毫秒用，
+    // 于是 253.6ms 的推理被记成 253634000ms（约 70 小时）。这里统一按纳秒换算。
+    let ns_to_ms = |key: &str| -> Option<u64> {
+        resp.get(key)
+            .and_then(|v| v.as_f64())
+            .map(|ns| (ns / 1_000_000.0).round() as u64)
+    };
+    let eval_ms = resp
+        .get("eval_duration_ms")
         .and_then(|v| v.as_u64())
-        .unwrap_or(timeout_ms);
+        .or_else(|| ns_to_ms("eval_duration"));
+    let total_ms = resp
+        .get("total_duration_ms")
+        .and_then(|v| v.as_u64())
+        .or_else(|| ns_to_ms("total_duration"));
     Ok(serde_json::json!({
         "ok": done,
         "probe": probe,
         "service": service,
         "model": model,
-        "ms": ms,
+        "ms": started.elapsed().as_millis() as u64,
+        "eval_ms": eval_ms,
+        "total_ms": total_ms,
         "done": done,
     }))
 }
@@ -821,33 +844,104 @@ fn parse_last_json(s: &str) -> Option<Value> {
     None
 }
 
+/// L3 并发上限。
+///
+/// 每个探针都会另起 curl / node 子进程，彼此无依赖，串行跑最坏要几分钟
+/// （单探针 timeout_ms 最高 30s）。全量放开又会同时打同一个服务
+/// （odysseus 一个服务就有 3 个探针），所以折中成 6。
+const L3_PARALLELISM: usize = 6;
+
+/// 并发执行一批 (service, probe_id, desc) 任务，返回与输入**同序**的结果。
+fn run_probe_jobs(jobs: &[(String, String, Option<String>)]) -> Vec<ProbeRun> {
+    let mut out: Vec<ProbeRun> = Vec::with_capacity(jobs.len());
+    // 分块并行：块内并发、块间串行 = 并发上限 L3_PARALLELISM。
+    // 由于块与块保持原有顺序，结果与 manifest 声明顺序一致。
+    for chunk in jobs.chunks(L3_PARALLELISM) {
+        let done: Vec<ProbeRun> = std::thread::scope(|s| {
+            let handles: Vec<_> = chunk
+                .iter()
+                .map(|(service, probe, desc)| {
+                    s.spawn(move || {
+                        let started = std::time::Instant::now();
+                        let res = run_probe(service, probe);
+                        let ms = started.elapsed().as_millis() as u64;
+                        let (ok, raw, vars) = match res {
+                            Ok(v) => {
+                                let ok = v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
+                                let raw = serde_json::to_string(&v).unwrap_or_default();
+                                (ok, raw, v)
+                            }
+                            Err(e) => (false, e, Value::Null),
+                        };
+                        ProbeRun {
+                            service: service.clone(),
+                            probe: probe.clone(),
+                            desc: desc.clone(),
+                            ok,
+                            raw,
+                            vars,
+                            ms,
+                        }
+                    })
+                })
+                .collect();
+
+            handles
+                .into_iter()
+                .map(|h| {
+                    h.join().unwrap_or_else(|_| ProbeRun {
+                        service: String::new(),
+                        probe: String::new(),
+                        desc: None,
+                        ok: false,
+                        raw: "探针线程 panic".to_string(),
+                        vars: Value::Null,
+                        ms: 0,
+                    })
+                })
+                .collect()
+        });
+        out.extend(done);
+    }
+    out
+}
+
 pub fn run_all_probes() -> Result<Vec<ProbeRun>, String> {
     let manifests = registry::load_manifests()?;
-    let mut out = Vec::new();
-    for m in &manifests {
-        for p in &m.health.l3 {
-            match run_probe(&m.id, &p.id) {
-                Ok(v) => {
-                    let ok = v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
-                    out.push(ProbeRun {
-                        service: m.id.clone(),
-                        probe: p.id.clone(),
-                        ok,
-                        raw: serde_json::to_string(&v).unwrap_or_default(),
-                        vars: v,
-                    });
-                }
-                Err(e) => out.push(ProbeRun {
-                    service: m.id.clone(),
-                    probe: p.id.clone(),
-                    ok: false,
-                    raw: e,
-                    vars: Value::Null,
-                }),
-            }
-        }
-    }
-    Ok(out)
+
+    // 摊平成任务列表，带上 desc 供 UI 展示「这个探针到底在验什么」
+    let jobs: Vec<(String, String, Option<String>)> = manifests
+        .iter()
+        .flat_map(|m| {
+            m.health
+                .l3
+                .iter()
+                .map(move |p| (m.id.clone(), p.id.clone(), p.desc.clone()))
+        })
+        .collect();
+
+    Ok(run_probe_jobs(&jobs))
+}
+
+/// 只跑单个服务的 L3 语义探针（卡片级「深检」用）。
+///
+/// 全量 L3 要 30–90s（openclaw 插件体检光 CLI 冷启动就 60s+），
+/// 只有单服务重跑才有可交互的粒度。
+pub fn run_service_probes(service: &str) -> Result<Vec<ProbeRun>, String> {
+    let manifests = registry::load_manifests()?;
+    let m = manifests
+        .iter()
+        .find(|m| m.id == service)
+        .ok_or_else(|| format!("未找到服务 {service}"))?;
+
+    let jobs: Vec<(String, String, Option<String>)> = m
+        .health
+        .l3
+        .iter()
+        .map(|p| (m.id.clone(), p.id.clone(), p.desc.clone()))
+        .collect();
+
+    Ok(run_probe_jobs(&jobs))
 }
 
 /// 运行所有服务的 L2 HTTP 探针，返回每个服务的 L2 状态映射。

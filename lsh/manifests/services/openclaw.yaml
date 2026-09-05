@@ -62,12 +62,17 @@ health:
       type: script
       script: probes/openclaw-plugins.mjs
       assert: 'healthy == true'
-      timeout_ms: 20000
+      # 【2026-09-05 实测】原值 20000ms 恒超时，探针被砍 → 输出空 → "非 JSON" 假失败。
+      # 网关没起时约 56s（只跑前两层）；网关在跑时会追加第三层 doctor --lint，
+      # 合计约 95s。留足余量取 180s，避免机器忙时再次被砍成假失败。
+      timeout_ms: 180000
       interval_ms: 300000
       cost: free
       note: |
         实测：插件校验失败 → 服务活着、/health 返回 200，但任何 agent turn 都会被拒。
         这是典型假活。
+        2026-09-05：插件注册表过期（persisted-registry-stale-source）会让本探针判 false，
+        属真实发现，执行 `openclaw plugins registry --refresh` 可修复。
     - id: turn-latency
       desc: '本机能跑出 280s 的 agent turn（直连同样请求只要 6.1s）'
       type: script

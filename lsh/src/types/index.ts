@@ -42,6 +42,35 @@ export interface L2ProbeStatus {
   ms: number
 }
 
+/** L3 语义探针单次运行结果（V0.8） */
+export interface ProbeRun {
+  service: string
+  probe: string
+  /** manifest 声明的人类可读描述 */
+  desc: string | null
+  ok: boolean
+  /** 失败时的错误串；成功时是原始 JSON 串 */
+  raw: string
+  /** 探针返回的完整值（含 result / error / model 等），结构随探针类型而异 */
+  vars: Record<string, unknown> | null
+  /** 墙钟耗时（ms），由后端在调用侧统一测量 */
+  ms: number
+}
+
+/** 单个服务的 L3 语义探针汇总 */
+export interface L3Summary {
+  /** 通过的探针数 */
+  pass: number
+  /** 声明的探针总数 */
+  total: number
+  /** 全部通过 */
+  ok: boolean
+  /** 明细，用于抽屉/展开查看 */
+  runs: ProbeRun[]
+  /** 服务整体耗时（所有探针 ms 之和，缺失时记 0） */
+  ms: number
+}
+
 export interface ServiceCard {
   id: string
   name: string
@@ -231,14 +260,6 @@ export interface FixApplyResult {
   steps: FixStepOut[]
   verify: VerifyOut | null
   rollback_note: string | null
-}
-
-export interface ProbeRun {
-  service: string
-  probe: string
-  ok: boolean
-  raw: string
-  vars: unknown
 }
 
 // ───────────────────────────── 日志中心（V0.2：聚合尾部 + 大小体检 + 旋转） ─────────────────────────────

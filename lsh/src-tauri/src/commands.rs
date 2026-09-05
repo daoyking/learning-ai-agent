@@ -601,6 +601,12 @@ pub fn run_probes() -> Result<Vec<crate::pb::ProbeRun>, String> {
     crate::pb::run_all_probes()
 }
 
+/// 只跑单个服务的 L3 语义探针。全量 L3 要 30–90s，卡片级重跑才是可交互的粒度。
+#[tauri::command]
+pub fn run_service_probes(service_id: String) -> Result<Vec<crate::pb::ProbeRun>, String> {
+    crate::pb::run_service_probes(&service_id)
+}
+
 /// 运行 L2 HTTP 探针，返回单个服务的 L2 健康结果。
 #[tauri::command]
 pub fn run_l2_probe(service_id: String) -> Result<serde_json::Value, String> {

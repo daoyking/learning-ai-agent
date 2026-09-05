@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { scanServices, previewAction, runAction, runAllL2Probes } from './lib/api'
+import {
+  scanServices,
+  previewAction,
+  runAction,
+  runAllL2Probes,
+  runAllL3Probes,
+} from './lib/api'
 import { ServiceCard } from './components/ServiceCard'
 import { PlaybookPanel } from './components/PlaybookPanel'
 import { LogPanel } from './components/LogPanel'
@@ -7,6 +13,7 @@ import { DoctorPanel } from './components/DoctorPanel'
 import type {
   ActionPreview,
   L2ProbeStatus,
+  L3Summary,
   RunActionResult,
   ScanResult,
   ServiceCard as Card,
@@ -65,6 +72,13 @@ export default function App() {
   const [l2Loading, setL2Loading] = useState(false)
   /** 记录已跑过 L2 自动扫描的那份 data，避免 effect 因 l2Loading 变化而重复触发 */
   const l2ScannedFor = useRef<ScanResult | null>(null)
+  // L3 语义探针结果。刻意不在启动时自动跑：L3 会真发请求（ollama 跑一次推理、
+  // openclaw 冷启动 CLI 体检 60s+），全量 30–90s，开机即跑太重。
+  const [l3Map, setL3Map] = useState<Record<string, L3Summary>>({})
+  const [l3Loading, setL3Loading] = useState(false)
+  const [l3Elapsed, setL3Elapsed] = useState(0)
+  const [l3Error, setL3Error] = useState<string | null>(null)
+  const l3Timer = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -105,9 +119,44 @@ export default function App() {
     void runL2Scan()
   }, [data, runL2Scan])
 
-  /** 卡片手动「检测」后回填结果到状态表 */
+  /** 卡片手动「检测」后回填 L2 结果到状态表 */
   const handleL2Result = useCallback((id: string, status: L2ProbeStatus) => {
     setL2StatusMap((prev) => ({ ...prev, [id]: status }))
+  }, [])
+
+  /** 全量 L3 深度体检（手动触发，带秒表；真正发请求，慢） */
+  const runL3Scan = useCallback(async () => {
+    setL3Loading(true)
+    setL3Error(null)
+    setL3Elapsed(0)
+    const startedAt = Date.now()
+    l3Timer.current = window.setInterval(() => {
+      setL3Elapsed(Date.now() - startedAt)
+    }, 500)
+    try {
+      setL3Map(await runAllL3Probes())
+    } catch (e) {
+      setL3Error(String(e))
+    } finally {
+      if (l3Timer.current !== null) {
+        window.clearInterval(l3Timer.current)
+        l3Timer.current = null
+      }
+      setL3Loading(false)
+    }
+  }, [])
+
+  /** 卸载时清掉秒表，避免在已卸载组件上 setState */
+  useEffect(
+    () => () => {
+      if (l3Timer.current !== null) window.clearInterval(l3Timer.current)
+    },
+    []
+  )
+
+  /** 卡片单服务「深检」后回填 L3 汇总 */
+  const handleL3Result = useCallback((id: string, summary: L3Summary) => {
+    setL3Map((prev) => ({ ...prev, [id]: summary }))
   }, [])
 
   const grouped = useMemo(() => {
@@ -157,6 +206,17 @@ export default function App() {
       fail: values.filter((v) => !v.ok).length,
     }
   }, [l2StatusMap])
+
+  /** L3 语义探针汇总：探针通过数 + 存在假活（有探针没过）的服务数 */
+  const l3Stats = useMemo(() => {
+    const values = Object.values(l3Map)
+    return {
+      services: values.length,
+      pass: values.reduce((n, s) => n + s.pass, 0),
+      total: values.reduce((n, s) => n + s.total, 0),
+      fakeAlive: values.filter((s) => !s.ok).length,
+    }
+  }, [l3Map])
 
   const openManage = useCallback((card: Card) => {
     setManage({ card, preview: null, result: null, loading: false, error: null })
@@ -242,6 +302,18 @@ export default function App() {
                 )}
               </span>
             )}
+            {l3Stats.total > 0 && (
+              <span className="text-slate-400">
+                {' '}
+                · L3 {l3Stats.pass}/{l3Stats.total} 通
+                {l3Stats.fakeAlive > 0 && (
+                  <span className="text-amber-400">
+                    {' '}
+                    · {l3Stats.fakeAlive} 个服务假活
+                  </span>
+                )}
+              </span>
+            )}
           </span>
         </div>
 
@@ -254,11 +326,24 @@ export default function App() {
           {l2Loading && (
             <span className="chip bg-ink-700 text-slate-400">L2 探测中…</span>
           )}
+          {l3Error && (
+            <span className="chip bg-status-down/15 text-status-down" title={l3Error}>
+              L3 失败
+            </span>
+          )}
           {data && (
             <span className="font-mono text-[10px] text-slate-600">
               {data.elapsed_ms}ms · {new Date(data.scanned_at_ms).toLocaleTimeString('zh-CN')}
             </span>
           )}
+          <button
+            onClick={() => void runL3Scan()}
+            disabled={l3Loading}
+            title="L3 语义探针会真实发起请求：ollama 跑一次推理、searxng 真搜一次、openclaw 冷启动 CLI 做插件体检。全量约 30–90 秒，因此不随启动自动跑。"
+            className="rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-300 transition-colors hover:border-amber-400 hover:text-amber-200 disabled:opacity-50"
+          >
+            {l3Loading ? `L3 深检中 ${(l3Elapsed / 1000).toFixed(0)}s` : 'L3 深度体检'}
+          </button>
           <button
             onClick={() => void load()}
             disabled={loading}
@@ -275,12 +360,12 @@ export default function App() {
         </div>
       )}
 
-      {/* V0.7 能力声明：L1 端口 + L2 HTTP 真实探测 + 真实启停 */}
+      {/* V0.8 能力声明：L1 端口 + L2 HTTP + L3 语义探针 */}
       <div className="mx-5 mt-3 rounded border border-status-degraded/30 bg-status-degraded/[0.07] px-3 py-2 text-[11px] leading-relaxed text-slate-400">
-        <b className="text-status-degraded">V0.7：L1 端口 + L2 HTTP 探测 + 真实启停。</b>
-        启动后自动对所有服务跑 L2 探针（真实 curl 请求，不是猜的），卡片上的{' '}
-        <b>✓ :200</b> 才是「HTTP 真的应答了」；<b>✗ :0</b> 表示连接失败。
-        卡片「检测」可单服务复测。L1/L2 绿但 L3 红 = 假活，L3 语义探针尚未接入。
+        <b className="text-status-degraded">V0.8：L1 端口 + L2 HTTP + L3 语义探针。</b>
+        启动后自动跑 L2（真实 curl）；L3 因要真发请求（跑推理 / 真搜一次 / 冷启动 CLI
+        体检）耗时 30–90 秒，改由顶部 <b>L3 深度体检</b> 手动触发，卡片「深检」可单服务复测。
+        <b>L1/L2 绿但 L3 红 = 假活</b> —— 端口在、心跳在、能力不在。
       </div>
 
       <main className="flex-1 overflow-y-auto px-5 py-4">
@@ -296,8 +381,10 @@ export default function App() {
                   key={card.id}
                   card={card}
                   l2Status={l2StatusMap[card.id]}
+                  l3Summary={l3Map[card.id] ?? null}
                   onManage={openManage}
                   onL2Result={handleL2Result}
+                  onL3Result={handleL3Result}
                 />
               ))}
             </div>
