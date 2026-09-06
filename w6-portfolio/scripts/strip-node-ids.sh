@@ -46,17 +46,26 @@ fi
 
 cp "$TMP" "$F"
 rm -f "$TMP"
-echo "✓ 已清理 $TARGET：移除 $COUNT 处属性，${BEFORE} B → ${AFTER} B"
+echo "✓ 已清理 ${TARGET}：移除 ${COUNT} 处属性，${BEFORE} B → ${AFTER} B"
 
-# 与 git HEAD 比对，确认只清掉了属性、没有动别的
+# 与 git HEAD 比对，确认只清掉了属性、没有动别的。
+#
+# 注意：必须把 HEAD 版本也 strip 一遍再比。只比工作区的话，只要 HEAD 里
+# 也带注入属性（误提交过一次就会），这个校验就永远报"有差异"，等于没有。
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
-  if git -C "$ROOT" diff --quiet -- "$TARGET"; then
-    echo "✓ 与 git HEAD 逐字节一致——确认只清掉了注入属性，内容无损失"
-    exit 0
-  else
-    echo "! 清理后与 git HEAD 仍有差异，请人工确认：git -C $ROOT diff -- $TARGET" >&2
-    exit 2
+  if git -C "$ROOT" show "HEAD:$TARGET" >/dev/null 2>&1; then
+    HEAD_STRIPPED=$(mktemp "${TMPDIR:-/tmp}/striphead.XXXXXX.html")
+    git -C "$ROOT" show "HEAD:$TARGET" \
+      | sed -E 's/[[:space:]]+data-page-node-id="[A-Za-z0-9_-]+"//g' > "$HEAD_STRIPPED"
+    if cmp -s "$HEAD_STRIPPED" "$F"; then
+      echo "✓ 与 git HEAD（双向 strip 后）逐字节一致——只清掉了注入属性，内容无损失"
+      rm -f "$HEAD_STRIPPED"
+      exit 0
+    fi
+    rm -f "$HEAD_STRIPPED"
   fi
+  echo "! 清理后与 git HEAD 仍有差异，请人工确认：git -C $ROOT diff -- $TARGET" >&2
+  exit 2
 fi
 
 exit 0
