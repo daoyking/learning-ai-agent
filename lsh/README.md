@@ -156,7 +156,11 @@ CLI 做插件体检、turn-latency 真跑一个 agent turn。2026-09-05 实测 1
   超过 30 分钟转琥珀色并标「已过期」，另有「清除缓存」按钮
 - 后端已并发化（`L3_PARALLELISM = 6`，分块并行保序），但受最长那根探针限制
   （阿姆达尔定律：openclaw 一根就占 113s），收益约 1.5x
-- 调探针耗时用 `cargo test --test l3_timing -- --nocapture`
+- **进度走事件流而不是一次性返回**：每跑完一个探针就推 `l3://progress`，
+  前端增量合并，卡片逐个亮起 + 顶部进度条。两分钟里只有一个秒表在动，
+  用户分不清是卡住了还是在正常跑
+- 调探针耗时用 `cargo test --test l3_timing -- --nocapture`；
+  验证流式契约（每个探针恰好回调一次 / 返回值保序）用 `cargo test --test l3_stream -- --nocapture`
 
 > **判读技巧**：某探针耗时 ≈ 它 manifest 里的 `timeout_ms`，说明它是被超时砍掉的，
 > 表现为「输出非 JSON」假失败，而不是真的慢。这正是 openclaw 那个探针踩过的坑。
@@ -220,7 +224,8 @@ trigger（可观测症状） → diagnose（只读取证） → conclude（带�
 - [ ] ChromaDB 0.6.x API bug 跟踪（降级报告已处理）
 - [ ] launchd 注册：openclaw / dsh 两个 job 仍未加载（需从 LSH 窗口或 Terminal.app 手动 bootstrap）
 - [x] **L3 结果本地持久化** —— 缓存在 localStorage，开窗口直接显示上次结果；每条带 `at` 时间戳，超 30 分钟标「已过期」转琥珀色，附「清除缓存」按钮
-- [ ] L3 进度事件流（现在是一次性返回，长探针期间只有秒表没有逐个完成的反馈）
+- [x] **L3 进度事件流（V0.9）** —— 后端每跑完一个探针就推 `l3://progress`，前端增量合并：顶部进度条 + `7/14` + 「刚跑完谁」，卡片逐个亮起并标「进行中 n/N」。一次性返回的 2 分钟里只有秒表在动，用户分不清是卡住还是在跑
+- [x] **同期只允许一轮全量 L3** —— `L3_STREAMING` 原子守卫，避免重复点击把 curl/node 子进程翻倍并互相覆盖前端状态
 
 ---
 

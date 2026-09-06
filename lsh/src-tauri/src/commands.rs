@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 
 use crate::exec;
 use crate::model::{Action, ServiceManifest};
@@ -605,6 +606,77 @@ pub fn run_probes() -> Result<Vec<crate::pb::ProbeRun>, String> {
 #[tauri::command]
 pub fn run_service_probes(service_id: String) -> Result<Vec<crate::pb::ProbeRun>, String> {
     crate::pb::run_service_probes(&service_id)
+}
+
+// ───────────────────────────── L3 流式深度体检（V0.9） ─────────────────────────────
+
+/// 同一时刻只允许一轮全量 L3 在跑。
+///
+/// 全量要 2 分钟，若允许并发，第二次点击会把 14 个探针的 curl/node 子进程
+/// 翻一倍，机器直接卡住，而且两轮进度事件会互相覆盖前端状态。
+static L3_STREAMING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 单个探针完成事件（前端据此显示 7/14 并让对应卡片提前亮起）
+#[derive(Clone, Serialize)]
+pub struct L3ProgressEvent {
+    pub done: usize,
+    pub total: usize,
+    pub run: crate::pb::ProbeRun,
+}
+
+#[derive(Clone, Serialize)]
+pub struct L3DoneEvent {
+    pub runs: Vec<crate::pb::ProbeRun>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct L3ErrorEvent {
+    pub error: String,
+}
+
+/// 全量 L3 深度体检（流式版）。
+///
+/// 立刻返回，进度通过 `l3://progress` 逐个推送，结束时发 `l3://done`（失败发
+/// `l3://error`）。阻塞式 invoke 在两分钟里给不出任何反馈，只有一个秒表在动，
+/// 用户无法判断是卡住了还是在正常跑。
+#[tauri::command]
+pub fn run_probes_streaming(app: tauri::AppHandle) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+
+    if L3_STREAMING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("已有一轮 L3 深度体检在跑".to_string())
+    }
+
+    std::thread::spawn(move || {
+        let emit_progress = |done: usize, total: usize, run: &crate::pb::ProbeRun| {
+            let _ = app.emit(
+                "l3://progress",
+                L3ProgressEvent {
+                    done,
+                    total,
+                    run: run.clone(),
+                },
+            );
+        };
+        let cb: &dyn Fn(usize, usize, &crate::pb::ProbeRun) = &emit_progress;
+        let result = crate::pb::run_all_probes_with(Some(cb));
+
+        // 先解锁再发结束事件：前端收到 done 后立刻可以再点一次
+        L3_STREAMING.store(false, Ordering::SeqCst);
+        match result {
+            Ok(runs) => {
+                let _ = app.emit("l3://done", L3DoneEvent { runs });
+            }
+            Err(e) => {
+                let _ = app.emit("l3://error", L3ErrorEvent { error: e });
+            }
+        }
+    });
+
+    Ok(())
 }
 
 /// 运行 L2 HTTP 探针，返回单个服务的 L2 健康结果。

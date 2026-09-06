@@ -852,61 +852,85 @@ fn parse_last_json(s: &str) -> Option<Value> {
 const L3_PARALLELISM: usize = 6;
 
 /// 并发执行一批 (service, probe_id, desc) 任务，返回与输入**同序**的结果。
-fn run_probe_jobs(jobs: &[(String, String, Option<String>)]) -> Vec<ProbeRun> {
-    let mut out: Vec<ProbeRun> = Vec::with_capacity(jobs.len());
-    // 分块并行：块内并发、块间串行 = 并发上限 L3_PARALLELISM。
-    // 由于块与块保持原有顺序，结果与 manifest 声明顺序一致。
-    for chunk in jobs.chunks(L3_PARALLELISM) {
-        let done: Vec<ProbeRun> = std::thread::scope(|s| {
-            let handles: Vec<_> = chunk
-                .iter()
-                .map(|(service, probe, desc)| {
-                    s.spawn(move || {
-                        let started = std::time::Instant::now();
-                        let res = run_probe(service, probe);
-                        let ms = started.elapsed().as_millis() as u64;
-                        let (ok, raw, vars) = match res {
-                            Ok(v) => {
-                                let ok = v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
-                                let raw = serde_json::to_string(&v).unwrap_or_default();
-                                (ok, raw, v)
-                            }
-                            Err(e) => (false, e, Value::Null),
-                        };
-                        ProbeRun {
-                            service: service.clone(),
-                            probe: probe.clone(),
-                            desc: desc.clone(),
-                            ok,
-                            raw,
-                            vars,
-                            ms,
-                        }
-                    })
-                })
-                .collect();
+///
+/// `on_progress` 每完成**一个**探针就调用一次，参数是 (已完成数, 总数, 刚完成这条)。
+/// 它在**发起调用的线程**上执行（不是子线程），所以实现里可以直接发射 Tauri 事件、
+/// 触碰非 Send 的东西，不需要加锁。
+///
+/// 顺序说明：回调顺序是**完成顺序**（乱序），返回值顺序是**声明顺序**。
+/// 做法是用 mpsc 收集结果填回各自槽位，最后按槽位顺序取出 ——
+/// 这样既能在长探针跑完的瞬间通知前端，又不会打乱 UI 的展示次序。
+fn run_probe_jobs(
+    jobs: &[(String, String, Option<String>)],
+    on_progress: Option<&dyn Fn(usize, usize, &ProbeRun)>,
+) -> Vec<ProbeRun> {
+    let total = jobs.len();
+    let mut slots: Vec<Option<ProbeRun>> = (0..total).map(|_| None).collect();
+    let mut done = 0usize;
 
-            handles
-                .into_iter()
-                .map(|h| {
-                    h.join().unwrap_or_else(|_| ProbeRun {
-                        service: String::new(),
-                        probe: String::new(),
-                        desc: None,
-                        ok: false,
-                        raw: "探针线程 panic".to_string(),
-                        vars: Value::Null,
-                        ms: 0,
-                    })
-                })
-                .collect()
+    for (chunk_index, chunk) in jobs.chunks(L3_PARALLELISM).enumerate() {
+        let base = chunk_index * L3_PARALLELISM;
+        std::thread::scope(|s| {
+            let (tx, rx) = std::sync::mpsc::channel::<(usize, ProbeRun)>();
+            for (offset, (service, probe, desc)) in chunk.iter().enumerate() {
+                let tx = tx.clone();
+                let (service, probe, desc) = (service.as_str(), probe.as_str(), desc.clone());
+                s.spawn(move || {
+                    // catch_unwind 只包住探针本身：panic 时也要发出一条消息，
+                    // 否则调用方收不满 chunk.len() 条会一直阻塞在 recv 上。
+                    let started = std::time::Instant::now();
+                    let res =
+                        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            run_probe(service, probe)
+                        }));
+                    let ms = started.elapsed().as_millis() as u64;
+                    let (ok, raw, vars) = match res {
+                        Ok(Ok(v)) => {
+                            let ok = v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
+                            let raw = serde_json::to_string(&v).unwrap_or_default();
+                            (ok, raw, v)
+                        }
+                        Ok(Err(e)) => (false, e, Value::Null),
+                        Err(_) => (false, "探针线程 panic".to_string(), Value::Null),
+                    };
+                    let run = ProbeRun {
+                        service: service.to_string(),
+                        probe: probe.to_string(),
+                        desc,
+                        ok,
+                        raw,
+                        vars,
+                        ms,
+                    };
+                    let _ = tx.send((offset, run));
+                });
+            }
+            // 丢掉发起方持有的 sender，rx 才能在所有子线程结束后正常关闭
+            drop(tx);
+
+            // 每个子线程必定发且只发一条（panic 已被 catch_unwind 兜住）
+            for _ in 0..chunk.len() {
+                let Ok((offset, run)) = rx.recv() else { break };
+                done += 1;
+                if let Some(f) = on_progress {
+                    f(done, total, &run)
+                }
+                slots[base + offset] = Some(run);
+            }
         });
-        out.extend(done);
     }
-    out
+
+    slots.into_iter().flatten().collect()
 }
 
 pub fn run_all_probes() -> Result<Vec<ProbeRun>, String> {
+    run_all_probes_with(None)
+}
+
+/// 同 [`run_all_probes`]，但每完成一个探针就回调一次（用于流式推送进度）。
+pub fn run_all_probes_with(
+    on_progress: Option<&dyn Fn(usize, usize, &ProbeRun)>,
+) -> Result<Vec<ProbeRun>, String> {
     let manifests = registry::load_manifests()?;
 
     // 摊平成任务列表，带上 desc 供 UI 展示「这个探针到底在验什么」
@@ -920,7 +944,7 @@ pub fn run_all_probes() -> Result<Vec<ProbeRun>, String> {
         })
         .collect();
 
-    Ok(run_probe_jobs(&jobs))
+    Ok(run_probe_jobs(&jobs, on_progress))
 }
 
 /// 只跑单个服务的 L3 语义探针（卡片级「深检」用）。
@@ -928,6 +952,14 @@ pub fn run_all_probes() -> Result<Vec<ProbeRun>, String> {
 /// 全量 L3 要 30–90s（openclaw 插件体检光 CLI 冷启动就 60s+），
 /// 只有单服务重跑才有可交互的粒度。
 pub fn run_service_probes(service: &str) -> Result<Vec<ProbeRun>, String> {
+    run_service_probes_with(service, None)
+}
+
+/// 同 [`run_service_probes`]，但每完成一个探针就回调一次。
+pub fn run_service_probes_with(
+    service: &str,
+    on_progress: Option<&dyn Fn(usize, usize, &ProbeRun)>,
+) -> Result<Vec<ProbeRun>, String> {
     let manifests = registry::load_manifests()?;
     let m = manifests
         .iter()
@@ -941,7 +973,7 @@ pub fn run_service_probes(service: &str) -> Result<Vec<ProbeRun>, String> {
         .map(|p| (m.id.clone(), p.id.clone(), p.desc.clone()))
         .collect();
 
-    Ok(run_probe_jobs(&jobs))
+    Ok(run_probe_jobs(&jobs, on_progress))
 }
 
 /// 运行所有服务的 L2 HTTP 探针，返回每个服务的 L2 状态映射。

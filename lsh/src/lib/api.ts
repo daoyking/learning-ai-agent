@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
   ActionPreview,
   L2ProbeStatus,
@@ -240,4 +241,85 @@ export async function runServiceL3Probes(
   }
   const runs = await invoke<ProbeRun[]>('run_service_probes', { serviceId })
   return summarizeL3(runs)[serviceId] ?? null
+}
+
+// ─────────────────────────── L3 流式深度体检（V0.9） ───────────────────────────
+
+export const L3_PROGRESS_EVENT = 'l3://progress'
+export const L3_DONE_EVENT = 'l3://done'
+export const L3_ERROR_EVENT = 'l3://error'
+
+/** 单个探针跑完时推送一次 */
+export interface L3ProgressPayload {
+  done: number
+  total: number
+  run: ProbeRun
+}
+
+export interface L3StreamHandlers {
+  onProgress: (payload: L3ProgressPayload) => void
+  onDone: (runs: ProbeRun[]) => void
+  onError: (message: string) => void
+}
+
+/**
+ * 把一条探针结果合并进汇总表（流式进度用）。
+ *
+ * 同一服务的同一探针重跑时覆盖旧结果，其余保留 —— 所以中途看到的
+ * 「✓ 1/2」是真实的半成品状态，不是伪造的绿灯。
+ */
+export function mergeProbeRun(
+  map: Record<string, L3Summary>,
+  run: ProbeRun
+): Record<string, L3Summary> {
+  const prev = map[run.service]
+  const runs = prev
+    ? prev.runs.filter((r) => r.probe !== run.probe).concat(run)
+    : [run]
+  const pass = runs.filter((r) => r.ok).length
+  return {
+    ...map,
+    [run.service]: {
+      pass,
+      total: runs.length,
+      ok: runs.length > 0 && pass === runs.length,
+      runs,
+      ms: runs.reduce((n, r) => n + r.ms, 0),
+      at: Date.now(),
+    },
+  }
+}
+
+/**
+ * 全量 L3 深度体检（流式）：立刻返回，进度靠事件推送。
+ *
+ * 阻塞式 invoke 在两分钟里给不出任何反馈，只有一个秒表在动，
+ * 用户分不清是卡住了还是在正常跑。改成事件流后每完成一个探针就推一次，
+ * 前端既能显示 7/14，也能让对应卡片提前亮起。
+ *
+ * @returns 取消监听的函数（组件卸载/体检结束时调用）
+ */
+export async function runL3Streaming(
+  handlers: L3StreamHandlers
+): Promise<UnlistenFn> {
+  if (!isTauri()) {
+    throw new Error('L3 探针需要 Tauri 运行环境，请用 pnpm tauri:dev 启动')
+  }
+  // 先订阅再发起：invoke 几乎立刻返回，探针可能马上就开始上报，
+  // 晚一步注册就会漏掉最前面那几条（而且是最快的那几个服务）。
+  const unlisteners = await Promise.all([
+    listen<L3ProgressPayload>(L3_PROGRESS_EVENT, (e) =>
+      handlers.onProgress(e.payload)
+    ),
+    listen<{ runs: ProbeRun[] }>(L3_DONE_EVENT, (e) =>
+      handlers.onDone(e.payload.runs)
+    ),
+    listen<{ error: string }>(L3_ERROR_EVENT, (e) =>
+      handlers.onError(e.payload.error)
+    ),
+  ])
+  await invoke('run_probes_streaming')
+  return () => {
+    for (const un of unlisteners) un()
+  }
 }

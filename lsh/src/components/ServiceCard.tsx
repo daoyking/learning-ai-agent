@@ -76,6 +76,8 @@ interface Props {
   card: Card
   l2Status: L2ProbeStatus | null
   l3Summary: L3Summary | null
+  /** 全量 L3 扫描进行中（此时卡片上的结果可能是只跑了一部分的半成品） */
+  l3Scanning: boolean
   onManage: (card: Card) => void
   onL2Result: (id: string, status: L2ProbeStatus) => void
   onL3Result: (id: string, summary: L3Summary) => void
@@ -85,12 +87,15 @@ export function ServiceCard({
   card,
   l2Status,
   l3Summary,
+  l3Scanning,
   onManage,
   onL2Result,
   onL3Result,
 }: Props) {
   const conflict = card.port_conflict
   const sup = SUPERVISION[card.supervised ?? 'not_applicable']
+  /** 全量扫描中且这个服务还有探针没回报 —— 卡片上显示的是半成品，要标出来 */
+  const l3Partial = l3Scanning && (l3Summary?.total ?? 0) < card.l3_count
   const [l2Loading, setL2Loading] = useState(false)
   const [l2Error, setL2Error] = useState<string | null>(null)
   const [l3Loading, setL3Loading] = useState(false)
@@ -244,6 +249,15 @@ export function ServiceCard({
               ) : (
                 <span className="text-[10px] text-slate-600">未检测</span>
               )}
+              {/* 半成品结果不伪装成结论：直接说明还有探针在跑 */}
+              {l3Partial && (
+                <span
+                  className="shrink-0 animate-pulse text-[10px] text-sky-400"
+                  title={`已回报 ${l3Summary?.total ?? 0}/${card.l3_count} 个探针，其余仍在跑`}
+                >
+                  进行中 {l3Summary?.total ?? 0}/{card.l3_count}
+                </span>
+              )}
               {l3Error && (
                 <span className="truncate text-[10px] text-rose-400" title={l3Error}>
                   {l3Error}
@@ -252,9 +266,13 @@ export function ServiceCard({
             </div>
             <button
               onClick={handleL3Probe}
-              disabled={l3Loading}
+              disabled={l3Loading || l3Scanning}
               className="shrink-0 rounded border border-ink-600 px-2 py-0.5 text-[10px] text-slate-400 transition-colors hover:border-amber-500/60 hover:text-amber-300 disabled:opacity-40"
-              title="只跑这个服务的语义探针（真发请求，openclaw 约 60s）"
+              title={
+                l3Scanning
+                  ? '全量深度体检进行中，结束后可单独复测'
+                  : '只跑这个服务的语义探针（真发请求，openclaw 约 60s）'
+              }
             >
               {l3Loading ? `深检 ${(l3Elapsed / 1000).toFixed(0)}s` : '深检'}
             </button>

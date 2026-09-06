@@ -25,6 +25,7 @@ pub fn run() {
             commands::diagnose_playbook,
             commands::run_probes,
             commands::run_service_probes,
+            commands::run_probes_streaming,
             commands::run_l2_probe,
             commands::run_all_l2_probes,
             commands::list_log_sources,

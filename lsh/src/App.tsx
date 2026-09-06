@@ -4,8 +4,11 @@ import {
   previewAction,
   runAction,
   runAllL2Probes,
-  runAllL3Probes,
+  runL3Streaming,
+  mergeProbeRun,
+  summarizeL3,
 } from './lib/api'
+import type { UnlistenFn } from '@tauri-apps/api/event'
 import { L3_STALE_MS, clearL3, formatAge, loadL3, saveL3 } from './lib/l3Store'
 import { ServiceCard } from './components/ServiceCard'
 import { PlaybookPanel } from './components/PlaybookPanel'
@@ -15,6 +18,7 @@ import type {
   ActionPreview,
   L2ProbeStatus,
   L3Summary,
+  ProbeRun,
   RunActionResult,
   ScanResult,
   ServiceCard as Card,
@@ -80,7 +84,11 @@ export default function App() {
   const [l3Loading, setL3Loading] = useState(false)
   const [l3Elapsed, setL3Elapsed] = useState(0)
   const [l3Error, setL3Error] = useState<string | null>(null)
+  /** 流式进度：已完成 / 总数，以及最近跑完的那条（用来显示「刚跑完谁」） */
+  const [l3Progress, setL3Progress] = useState<{ done: number; total: number } | null>(null)
+  const [l3LastRun, setL3LastRun] = useState<ProbeRun | null>(null)
   const l3Timer = useRef<number | null>(null)
+  const l3Unlisten = useRef<UnlistenFn | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -155,32 +163,65 @@ export default function App() {
     setL2StatusMap((prev) => ({ ...prev, [id]: status }))
   }, [])
 
-  /** 全量 L3 深度体检（手动触发，带秒表；真正发请求，慢） */
+  /** 收尾：停秒表、解监听、复位 loading（正常结束与出错都走这里） */
+  const finishL3Scan = useCallback(() => {
+    if (l3Timer.current !== null) {
+      window.clearInterval(l3Timer.current)
+      l3Timer.current = null
+    }
+    if (l3Unlisten.current) {
+      l3Unlisten.current()
+      l3Unlisten.current = null
+    }
+    setL3Loading(false)
+    setL3Progress(null)
+    setL3LastRun(null)
+  }, [])
+
+  /**
+   * 全量 L3 深度体检（流式）。
+   *
+   * 不再阻塞式等待 2 分钟：后端每跑完一个探针就推一次事件，这里增量合并进
+   * l3Map，卡片逐个亮起；结束后用完整结果再覆盖一次，保证顺序与耗时口径一致。
+   */
   const runL3Scan = useCallback(async () => {
     setL3Loading(true)
     setL3Error(null)
     setL3Elapsed(0)
+    setL3Progress(null)
+    setL3LastRun(null)
     const startedAt = Date.now()
     l3Timer.current = window.setInterval(() => {
       setL3Elapsed(Date.now() - startedAt)
     }, 500)
     try {
-      setL3Map(await runAllL3Probes())
+      l3Unlisten.current = await runL3Streaming({
+        onProgress: ({ done, total, run }) => {
+          setL3Progress({ done, total })
+          setL3LastRun(run)
+          setL3Map((prev) => mergeProbeRun(prev, run))
+        },
+        onDone: (runs) => {
+          setL3Map(summarizeL3(runs))
+          finishL3Scan()
+        },
+        onError: (message) => {
+          setL3Error(message)
+          finishL3Scan()
+        },
+      })
     } catch (e) {
+      // invoke 本身失败（比如后端判定已有一轮在跑）
       setL3Error(String(e))
-    } finally {
-      if (l3Timer.current !== null) {
-        window.clearInterval(l3Timer.current)
-        l3Timer.current = null
-      }
-      setL3Loading(false)
+      finishL3Scan()
     }
-  }, [])
+  }, [finishL3Scan])
 
-  /** 卸载时清掉秒表，避免在已卸载组件上 setState */
+  /** 卸载时清掉秒表并解监听，避免在已卸载组件上 setState */
   useEffect(
     () => () => {
       if (l3Timer.current !== null) window.clearInterval(l3Timer.current)
+      if (l3Unlisten.current) l3Unlisten.current()
     },
     []
   )
@@ -402,6 +443,18 @@ export default function App() {
               L3 失败
             </span>
           )}
+          {/* 流式进度：让用户知道是在正常跑，而不是卡住了 */}
+          {l3Loading && l3LastRun && (
+            <span
+              className="chip bg-ink-700 text-slate-400"
+              title={l3LastRun.desc ?? `${l3LastRun.service} 的 L3 语义探针`}
+            >
+              刚跑完 {l3LastRun.service}/{l3LastRun.probe}{' '}
+              <span className={l3LastRun.ok ? 'text-emerald-400' : 'text-rose-400'}>
+                {l3LastRun.ok ? '✓' : '✗'}
+              </span>
+            </span>
+          )}
           {data && (
             <span className="font-mono text-[10px] text-slate-600">
               {data.elapsed_ms}ms · {new Date(data.scanned_at_ms).toLocaleTimeString('zh-CN')}
@@ -413,7 +466,11 @@ export default function App() {
             title="L3 语义探针会真实发起请求：ollama 跑一次推理、searxng 真搜一次、openclaw 冷启动 CLI 做插件体检。全量约 2 分钟，因此不随启动自动跑，结果会缓存在本地供下次打开直接查看。"
             className="rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-300 transition-colors hover:border-amber-400 hover:text-amber-200 disabled:opacity-50"
           >
-            {l3Loading ? `L3 深检中 ${(l3Elapsed / 1000).toFixed(0)}s` : 'L3 深度体检'}
+            {l3Loading
+              ? `L3 深检中 ${(l3Elapsed / 1000).toFixed(0)}s${
+                  l3Progress ? ` · ${l3Progress.done}/${l3Progress.total}` : ''
+                }`
+              : 'L3 深度体检'}
           </button>
           {!l3Loading && l3Stats.total > 0 && (
             <button
@@ -432,6 +489,20 @@ export default function App() {
             {loading ? '扫描中…' : '重新扫描'}
           </button>
         </div>
+
+        {/* 进度条贴在 header 底边：2 分钟的等待没有进度提示会让人以为卡死了 */}
+        {l3Loading && l3Progress && (
+          <div className="absolute inset-x-0 bottom-0 h-0.5 bg-ink-700">
+            <div
+              className="h-full bg-amber-400 transition-all duration-300"
+              style={{
+                width: `${Math.round(
+                  (l3Progress.done / Math.max(l3Progress.total, 1)) * 100
+                )}%`,
+              }}
+            />
+          </div>
+        )}
       </header>
 
       {error && (
@@ -440,11 +511,12 @@ export default function App() {
         </div>
       )}
 
-      {/* V0.8 能力声明：L1 端口 + L2 HTTP + L3 语义探针 */}
+      {/* V0.9 能力声明：L1 端口 + L2 HTTP + L3 语义探针（流式） */}
       <div className="mx-5 mt-3 rounded border border-status-degraded/30 bg-status-degraded/[0.07] px-3 py-2 text-[11px] leading-relaxed text-slate-400">
-        <b className="text-status-degraded">V0.8：L1 端口 + L2 HTTP + L3 语义探针。</b>
+        <b className="text-status-degraded">V0.9：L1 端口 + L2 HTTP + L3 语义探针。</b>
         启动后自动跑 L2（真实 curl）；L3 因要真发请求（跑推理 / 真搜一次 / 冷启动 CLI
-        体检）耗时 30–90 秒，改由顶部 <b>L3 深度体检</b> 手动触发，卡片「深检」可单服务复测。
+        体检）耗时约 2 分钟，改由顶部 <b>L3 深度体检</b> 手动触发，
+        <b>每个探针跑完即推送</b>（顶部进度条 + 卡片逐个亮起），结果缓存在本地供下次打开直接查看。
         <b>L1/L2 绿但 L3 红 = 假活</b> —— 端口在、心跳在、能力不在。
       </div>
 
@@ -462,6 +534,7 @@ export default function App() {
                   card={card}
                   l2Status={l2StatusMap[card.id]}
                   l3Summary={l3Map[card.id] ?? null}
+                  l3Scanning={l3Loading}
                   onManage={openManage}
                   onL2Result={handleL2Result}
                   onL3Result={handleL3Result}
