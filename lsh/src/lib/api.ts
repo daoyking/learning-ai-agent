@@ -323,3 +323,18 @@ export async function runL3Streaming(
     for (const un of unlisteners) un()
   }
 }
+
+/**
+ * 在默认浏览器里打开外链（远程服务的「打开」按钮）。
+ *
+ * Tauri 下走 shell.open —— 权限 shell:allow-open 已在 capabilities/default.json 声明；
+ * 纯浏览器预览下退回 window.open。
+ */
+export async function openExternal(url: string): Promise<void> {
+  if (isTauri()) {
+    const { open } = await import('@tauri-apps/plugin-shell')
+    await open(url)
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}

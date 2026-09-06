@@ -15,6 +15,9 @@ pub struct ServiceManifest {
     pub icon: Option<String>,
     #[serde(default)]
     pub home: Option<String>,
+    /// 对外入口 URL。远程服务（kind=remote）靠它提供「在浏览器打开」。
+    #[serde(default)]
+    pub link: Option<String>,
     #[serde(default)]
     pub version_range: Option<String>,
     #[serde(default = "default_priority")]

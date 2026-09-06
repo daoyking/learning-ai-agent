@@ -153,7 +153,50 @@ function pathExists(p) {
   }
 }
 
-function buildCard(m, ports) {
+/**
+ * 远程服务（kind=remote）在扫描阶段就跑一次 L2。
+ *
+ * 与 src-tauri/src/commands.rs 的 build_card 保持一致：这类服务在本机
+ * 没有端口、进程、安装痕迹，唯一的存在证据就是 HTTP 响应。不跑它，
+ * 卡片就永远是「未知」。
+ */
+async function probeRemote(m) {
+  const l2 = m.health?.l2
+  if (!l2 || l2.type !== 'http') return { status: 'unknown', l2Status: null }
+
+  const timeoutMs = l2.timeout_ms ?? 5000
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs + 1000)
+  const startedAt = Date.now()
+
+  try {
+    const res = await fetch(l2.url, {
+      method: l2.method ?? 'GET',
+      signal: controller.signal,
+    })
+    const body = await res.text()
+    const ms = Date.now() - startedAt
+    const expectStatus = l2.expect_status ?? 200
+
+    // expect_body 是「响应体需匹配的正则」，不是请求体。
+    // 这一步不能省：托管服务常常是所有路径都返回 200 的 SPA 壳。
+    const statusOk = res.status === expectStatus
+    const bodyOk = l2.expect_body ? new RegExp(l2.expect_body).test(body) : true
+    const ok = statusOk && bodyOk
+
+    return {
+      status: ok ? 'running' : 'stopped',
+      l2Status: { ok, status: res.status, expect_status: expectStatus, ms },
+    }
+  } catch {
+    // 连不上就是不通。绝不当成「未知」以外的绿色。
+    return { status: 'stopped', l2Status: null }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function buildCard(m, ports) {
   const declared = m.detect?.ports?.[0] ?? null
   let listeningPort = null
   let pid = null
@@ -181,7 +224,14 @@ function buildCard(m, ports) {
     (m.detect?.launchd ?? []).length > 0 ||
     (m.detect?.paths ?? []).some(pathExists)
 
-  const status = listeningPort != null ? 'running' : hasTrace ? 'stopped' : 'unknown'
+  let status = listeningPort != null ? 'running' : hasTrace ? 'stopped' : 'unknown'
+  let l2Status = null
+
+  if (m.supervisor.kind === 'remote') {
+    const probed = await probeRemote(m)
+    status = probed.status
+    l2Status = probed.l2Status
+  }
 
   return {
     id: m.id,
@@ -205,12 +255,14 @@ function buildCard(m, ports) {
     playbooks: m.playbooks ?? [],
     l3_count: (m.health?.l3 ?? []).length,
     log_count: (m.logs ?? []).length,
+    link: m.link ?? null,
+    l2_status: l2Status,
   }
 }
 
 const ports = scanListeningPorts()
 const manifests = loadManifests()
-const services = manifests.map((m) => buildCard(m, ports))
+const services = await Promise.all(manifests.map((m) => buildCard(m, ports)))
 
 const snapshot = {
   services,

@@ -5,7 +5,7 @@ macOS 上的**本地自托管 AI 服务控制中心**。
 不是端口监控器——是能回答"这个服务**真的能用吗**"的语义级控制中心。
 
 ```
-本机实况：47 个监听端口 · 9 个纳管服务 · 7 个在线
+本机实况：49 个监听端口 · 10 个纳管服务 · 9 个在线（含 1 个远程托管）
 ```
 
 ---
@@ -42,7 +42,7 @@ lsh/
 │   ├── schema/
 │   │   ├── service-manifest.schema.json   # 服务描述格式（JSON Schema 2020-12）
 │   │   └── playbook.schema.json           # 排障剧本格式
-│   ├── services/*.yaml                    # 9 个服务的声明式描述
+│   ├── services/*.yaml                    # 10 个服务的声明式描述（含 1 个远程托管）
 │   └── playbooks/*.yaml                   # 13 个排障剧本
 ├── src/                                   # React 前端
 ├── src-tauri/                             # Rust 能力层
@@ -68,7 +68,7 @@ depends_on: [proxy]
 playbooks: [omniroute-ghost-proxy, omniroute-testall-pollution]
 ```
 
-**五种 supervisor 抽象**（这是整个系统的地基）：
+**六种 supervisor 抽象**（这是整个系统的地基）：
 
 | kind | 用于 | 关键约束 |
 |---|---|---|
@@ -77,6 +77,42 @@ playbooks: [omniroute-ghost-proxy, omniroute-testall-pollution]
 | `app` | Ollama / AnythingLLM / ClashX | 判断存活以主端口为准，别信代理 job |
 | `script` | Odysseus / ChromaDB | 必须 `setsid` 脱离进程组，`nohup &` 会被会话回收 |
 | `pty` | dsh | 见下 |
+| `remote` | OpenViking Studio（托管） | 见下 |
+
+### remote：把托管服务也纳入观测（2026-09-06）
+
+LSH 的价值不只是"管生命周期"，还有"回答这个服务真的能用吗"。
+托管服务启停不了，但"它现在是不是挂了"是每天都会遇到的问题 ——
+而且这类故障除了干等你无事可做，早一分钟知道就少浪费一分钟。
+
+`kind: remote` 就是为此存在的。它主动让渡掉三件事：
+
+- **没有 actions**：不给启停按钮，避免点了没反应
+- **没有 detect 线索**：它不装在本机，`detect.ports` 只会造出假绿
+- **不判监管**：`supervision.check: none`，不给"未托管"黄条（本就不归你管）
+
+换来的是：**扫描阶段就跑一次 L2**（全局唯一例外），因为那是它唯一的存在证据。
+
+```yaml
+supervisor: { kind: remote, supervision: { check: none } }
+link: 'https://openviking.net/studio/playground'
+health:
+  l2:
+    url: 'https://openviking.net/studio/health'
+    expect_status: 200
+    expect_body: '"status"\s*:\s*"ok"'   # 关键：别只判 200
+```
+
+#### 为什么托管服务的 L2 必须校验响应体
+
+`openviking.net` 下**所有路径都返回 200**（2026-09-06 实测）：
+`/health`、`/api/v1/health`、`/v1/models`，乃至一个不存在的路由，
+统统 200 + 同一份 index.html —— 前面挡着一层 SPA fallback。
+只有 `/studio/health` 与 `/studio/ready` 会真的返回 `{"status":"ok"}`。
+
+这里的 200 是零信息量的。顺带暴露了本项目自己的一个 bug：
+`run_l2_probe` 此前把 `expect_body` 当成 `-d` 请求体发出去了，
+对响应内容一个字都不校验 —— 这种壳会一直绿着。已修。
 
 ### dsh 的 TTY 问题（V0.1 已解决）
 

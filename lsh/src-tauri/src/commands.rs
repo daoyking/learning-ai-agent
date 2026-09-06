@@ -41,6 +41,8 @@ pub struct ServiceCard {
     /// 声明了几个 L3 语义探针（UI 提示"语义探针待接入"）
     pub l3_count: usize,
     pub log_count: usize,
+    /// 对外入口 URL（远程服务的「打开」，本地服务的 Web UI）
+    pub link: Option<String>,
     /// L2 HTTP 探针结果（ok + status + ms）
     pub l2_status: Option<L2ProbeStatus>,
 }
@@ -413,6 +415,29 @@ fn build_card(m: &ServiceManifest, ports: &[PortEntry]) -> ServiceCard {
     } else {
         "unknown"
     };
+    let mut status = status.to_string();
+
+    // 远程服务（kind=remote）在本机没有端口、进程、安装痕迹，上面三条判据全是
+    // unknown。它们唯一的存在证据就是 HTTP 响应 —— 所以这里是全局唯一一处
+    // 「扫描时就跑 L2」的例外，并把结果直接填进 l2_status，省掉用户手动点一次。
+    //
+    // 代价：扫描时间会掺入一次外网 RTT（实测 openviking.net 约 2s）。
+    // 远程卡数量少（都是 P2），且这张卡不跑 L2 就永远显示"未知"，代价可接受。
+    let mut l2_status = None;
+    if m.supervisor.kind == "remote" {
+        match crate::pb::run_l2_probe(&m.id, m) {
+            Ok(v) => {
+                let ok = v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
+                let code = v.get("status").and_then(|x| x.as_u64()).unwrap_or(0) as u16;
+                let expect = v.get("expect_status").and_then(|x| x.as_u64()).unwrap_or(200) as u16;
+                let ms = v.get("ms").and_then(|x| x.as_u64()).unwrap_or(0);
+                status = if ok { "running" } else { "stopped" }.into();
+                l2_status = Some(L2ProbeStatus { ok, status: code, expect_status: expect, ms });
+            }
+            // 探针本身跑不起来（没声明 L2 / curl 异常）：不能因此报绿
+            Err(_) => status = "unknown".into(),
+        }
+    }
 
     // 监管判定是独立的第二维度：端口在 ≠ 有人盯着。
     // 本机实测 omniroute 就是端口在跑、launchd job 从未加载的孤儿进程。
@@ -445,7 +470,9 @@ fn build_card(m: &ServiceManifest, ports: &[PortEntry]) -> ServiceCard {
         playbooks: m.playbooks.clone(),
         l3_count: m.health.l3.len(),
         log_count: m.logs.len(),
-        l2_status: None, // 启动时不运行 L2（仅在用户点击时运行）
+        link: m.link.clone(),
+        // 只有 remote 在扫描阶段就跑过 L2；其余服务仍是用户点击时才跑
+        l2_status,
     }
 }
 
@@ -937,5 +964,46 @@ mod tests {
         assert_eq!(p.danger, "confirm");
         assert!(p.requires_confirm);
         assert!(!p.command.is_empty());
+    }
+
+    #[test]
+    fn remote_without_l2_is_unknown_never_running() {
+        // 远程服务在本机没有端口、进程、安装痕迹。没声明 L2 就没有任何判据 ——
+        // 绝不能因为"没查到问题"就报 running。
+        let yaml = r#"
+schema: lsh.service/v1
+id: fake-remote
+name: Fake Remote
+category: rag
+supervisor: { kind: remote }
+"#;
+        let m: crate::model::ServiceManifest = serde_yaml::from_str(yaml).unwrap();
+        let card = build_card(&m, &[]);
+        assert_eq!(card.status, "unknown", "没有 L2 的远程服务只能是未知");
+        assert!(card.l2_status.is_none());
+        // 本机判据对它一律不适用
+        assert!(card.port.is_none() && card.pid.is_none());
+    }
+
+    /// 真机验证：远程卡片必须真的发一次 HTTP 才敢报 running。
+    ///
+    /// 默认不跑（依赖外网）。验证方式：
+    ///   cargo test --lib -- --ignored remote_card_uses_live_l2
+    #[test]
+    #[ignore = "依赖外网，CI 不跑；改完 manifest 的 L2 后手动验证一次"]
+    fn remote_card_uses_live_l2() {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("manifests")
+            .join("services");
+        let raw = std::fs::read_to_string(dir.join("openviking-cloud.yaml")).unwrap();
+        let m: crate::model::ServiceManifest = serde_yaml::from_str(&raw).unwrap();
+        let card = build_card(&m, &[]);
+        let l2 = card.l2_status.expect("remote 卡片必须带上 L2 结果");
+        println!("status={} l2={:?} ms={}", card.status, l2, l2.ms);
+        assert_eq!(card.status, "running", "托管实例在线时应报 running");
+        assert!(l2.ok);
+        assert!(l2.ms > 0, "ms 必须真实计时（修 bug 前恒为 0）");
     }
 }

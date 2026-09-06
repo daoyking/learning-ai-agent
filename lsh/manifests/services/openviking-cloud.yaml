@@ -1,0 +1,75 @@
+schema: lsh.service/v1
+id: openviking-cloud
+name: OpenViking Studio（托管）
+description: 火山引擎托管的 OpenViking Studio —— 上下文实验场。本机只观测，不管生命周期
+category: rag
+icon: ':openviking:'
+priority: P2
+tags: [saas, remote, context-db]
+
+link: 'https://openviking.net/studio/playground'
+
+# detect 全空是刻意的：这个服务在本机没有端口、没有进程、没有安装痕迹。
+# 它不是"没检测到"—— 它根本不装在本机。写 ports 只会制造假绿。
+detect: {}
+
+supervisor:
+  kind: remote
+  supervision: { check: none }
+  note: |
+    为什么能进 LSH 却不能启停：
+
+    LSH 的价值不止于"管生命周期"，还有"回答这个服务真的能用吗"。
+    托管服务显然启停不了，但"它现在是不是挂了"是每天都会遇到的问题 ——
+    而且这类故障你只能干等，早一分钟知道就少浪费一分钟。
+
+    所以这里把启停让渡掉，只保留观测：
+      - 无 actions（UI 不给启停按钮，避免点了没反应）
+      - supervision.check=none（不报"未监管"，它本就不归你管）
+
+    对应地，build_card 对 kind=remote 有一个例外：扫描时就跑一次 L2，
+    因为那是它唯一的存在证据。
+
+health:
+  l2:
+    type: http
+    url: 'https://openviking.net/studio/health'
+    expect_status: 200
+    # ⚠️ 千万别只判 200：这个域名下所有路径都返回 200（SPA fallback），
+    # 2026-09-06 实测 /health、/api/v1/health、/v1/models 乃至不存在的路由
+    # 全部 200 + index.html。只有 /studio/health 说真话。
+    # 这也是 L2 的 expect_body 此前被当成请求体发出去时必须修掉的原因 ——
+    # 不校验响应内容，这层壳会一直绿着。
+    expect_body: '"status"\s*:\s*"ok"'
+    timeout_ms: 10000
+  l3:
+    - id: studio-gate
+      desc: 'health / ready / 页面壳三项全通才算开门（只验入口，不验数据面）'
+      type: script
+      script: probes/openviking-studio.mjs
+      assert: 'health && ready && shell'
+      timeout_ms: 30000
+      interval_ms: 300000
+      cost: free
+      note: |
+        能力边界写清楚，免得以后自己骗自己：这个探针发的是三条真请求，
+        但验的是**入口**，不是你的会话/记忆/检索。后者需要 API key
+        （LSH_OPENVIKING_KEY），没有时探针返回 data_plane: unverified，
+        不会假装验过了。
+
+        真正的语义验证要等本地部署 openviking-server（端口 1933）之后 ——
+        那时才能像其余 8 个服务一样，真的写一条记忆再检索回来。
+
+depends_on: []
+provides: [context-db-ui]
+
+config:
+  files: []
+  readonly: true
+
+logs: []
+
+playbooks: []
+
+danger:
+  stop_requires_confirm: false

@@ -532,7 +532,9 @@ export default function App() {
                 <ServiceCard
                   key={card.id}
                   card={card}
-                  l2Status={l2StatusMap[card.id]}
+                  // remote 服务在扫描时就跑过 L2（它没别的判据），结果带在卡片上；
+                  // 手动「检测」的结果优先，因为那是最新的
+                  l2Status={l2StatusMap[card.id] ?? card.l2_status}
                   l3Summary={l3Map[card.id] ?? null}
                   l3Scanning={l3Loading}
                   onManage={openManage}

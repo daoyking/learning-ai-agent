@@ -26,6 +26,10 @@
     },
     "icon": { "type": "string", "description": "图标路径或内置图标名（如 :ollama:）。" },
     "home": { "type": "string", "description": "服务根目录，可用于 ${home} 变量展开。" },
+    "link": {
+      "type": "string",
+      "description": "对外入口 URL。远程服务（supervisor.kind=remote）用它提供『在浏览器打开』，本地服务也可指向 Web UI。"
+    },
     "version_range": {
       "type": "string",
       "description": "semver range，用于 drift 检测：探测失败时提示『可能已升级，请更新 manifest』。"
@@ -59,8 +63,8 @@
       "properties": {
         "kind": {
           "type": "string",
-          "enum": ["launchd", "docker", "app", "script", "pty"],
-          "description": "launchd=系统托管 / docker=容器 / app=GUI 应用 / script=脚本脱离会话 / pty=需真实伪终端"
+          "enum": ["launchd", "docker", "app", "script", "pty", "remote"],
+          "description": "launchd=系统托管 / docker=容器 / app=GUI 应用 / script=脚本脱离会话 / pty=需真实伪终端 / remote=本机不承载，只有 HTTP 可达性（托管服务）。remote 下启停与监管判定均不适用，状态由 health.l2 的真实响应决定。"
         },
         "label": { "type": "string", "description": "[launchd] LaunchAgent label。" },
         "plist": {

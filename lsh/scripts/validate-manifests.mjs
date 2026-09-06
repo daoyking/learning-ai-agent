@@ -131,7 +131,25 @@ for (const { file, doc } of manifests) {
   }
 }
 
-// ---------- 8: playbook 自身校验 ----------
+// ---------- 8: remote 服务的声明必须与"本机不承载"自洽 ----------
+// 托管服务启停不了、本机也扫不到。允许带 actions 等于给一个点了没反应的按钮，
+// 允许带 detect.ports 等于让"端口通"去冒充一个根本不装在本机的服务。
+for (const { file, doc } of manifests) {
+  if (doc.supervisor.kind !== 'remote') continue
+
+  const acts = Object.keys(doc.supervisor.actions ?? {})
+  if (acts.length > 0) {
+    fail(file, `kind=remote 不该声明 actions（${acts.join(', ')}）—— 托管服务启停不了`)
+  }
+  if ((doc.detect?.ports ?? []).length > 0 || (doc.detect?.launchd ?? []).length > 0) {
+    fail(file, 'kind=remote 不该声明 detect.ports / detect.launchd —— 它不装在本机')
+  }
+  if (!doc.health?.l2) {
+    fail(file, 'kind=remote 必须声明 health.l2 —— 那是它唯一的存在证据')
+  }
+}
+
+// ---------- 9: playbook 自身校验 ----------
 const pbSchema = JSON.parse(readFileSync(PB_SCHEMA_PATH, 'utf8'))
 const pbValidate = ajv.compile(pbSchema)
 

@@ -18,7 +18,14 @@ export type SupervisionState =
   | 'not_applicable'
   | 'unknown'
 
-export type SupervisorKind = 'launchd' | 'docker' | 'app' | 'script' | 'pty'
+/** remote = 本机不承载的托管服务：没有启停动作，状态只由 HTTP 探针决定 */
+export type SupervisorKind =
+  | 'launchd'
+  | 'docker'
+  | 'app'
+  | 'script'
+  | 'pty'
+  | 'remote'
 
 export interface PortEntry {
   port: number
@@ -101,7 +108,9 @@ export interface ServiceCard {
   playbooks: string[]
   l3_count: number
   log_count: number
-  /** L2 HTTP 探针结果（手动触发时填充，启动时不运行） */
+  /** 对外入口 URL。远程服务靠它提供「在浏览器打开」 */
+  link: string | null
+  /** L2 HTTP 探针结果。启动时一般不跑（用户点「检测」才跑）；remote 是例外——它没别的判据 */
   l2_status: L2ProbeStatus | null
 }
 

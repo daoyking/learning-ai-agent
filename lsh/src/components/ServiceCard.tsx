@@ -6,7 +6,7 @@ import type {
   SupervisionState,
 } from '../types'
 import { StatusDot, statusLabel } from './StatusDot'
-import { runL2Probe, runServiceL3Probes } from '../lib/api'
+import { runL2Probe, runServiceL3Probes, openExternal } from '../lib/api'
 import { formatAge } from '../lib/l3Store'
 import { useEffect, useRef, useState } from 'react'
 
@@ -38,6 +38,7 @@ const KIND_LABEL: Record<string, string> = {
   app: 'GUI App',
   script: '脚本',
   pty: '伪终端',
+  remote: '远程',
 }
 
 const KIND_COLOR: Record<string, string> = {
@@ -46,6 +47,7 @@ const KIND_COLOR: Record<string, string> = {
   app: '#A78BFA',
   script: '#FBBF24',
   pty: '#F472B6',
+  remote: '#22D3EE',
 }
 
 /**
@@ -181,17 +183,20 @@ export function ServiceCard({
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
-        <span className="chip bg-ink-700 text-slate-300">
-          :{card.port ?? '—'}
-        </span>
-        {card.pid != null && (
-          <span className="chip bg-ink-700 text-slate-400">pid {card.pid}</span>
-        )}
-        {card.process && (
-          <span className="chip bg-ink-700 text-slate-400">{card.process}</span>
-        )}
-      </div>
+      {/* 远程服务没有端口/pid/进程，这一行对它无意义 */}
+      {(card.port != null || card.pid != null || card.process) && (
+        <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+          <span className="chip bg-ink-700 text-slate-300">
+            :{card.port ?? '—'}
+          </span>
+          {card.pid != null && (
+            <span className="chip bg-ink-700 text-slate-400">pid {card.pid}</span>
+          )}
+          {card.process && (
+            <span className="chip bg-ink-700 text-slate-400">{card.process}</span>
+          )}
+        </div>
+      )}
 
       {/* 端口被别的进程占了 —— 这类问题最常见也最难查，单独高亮 */}
       {conflict && (
@@ -200,8 +205,8 @@ export function ServiceCard({
         </div>
       )}
 
-      {/* L2 HTTP 探针结果 */}
-      {card.port != null && (
+      {/* L2 HTTP 探针结果。远程服务没有端口，但探测照跑 —— 那是它唯一的存在证据 */}
+      {(card.port != null || card.supervisor_kind === 'remote') && (
         <div className="flex items-center justify-between rounded border border-ink-700 bg-ink-900/50 px-2 py-1.5">
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-slate-500">L2 HTTP 探针</span>
@@ -328,6 +333,16 @@ export function ServiceCard({
             <span className="text-[10px] text-slate-600">
               ← {card.depends_on.join(', ')}
             </span>
+          )}
+          {/* 远程服务没有启停可言，给它「打开」而不是「管理」 */}
+          {card.link && (
+            <button
+              onClick={() => void openExternal(card.link as string)}
+              className="rounded border border-ink-600 px-2 py-0.5 text-[10px] text-slate-300 transition-colors hover:border-cyan-500/60 hover:text-cyan-300"
+              title={`在浏览器打开 ${card.link}`}
+            >
+              打开 ↗
+            </button>
           )}
           <button
             onClick={() => onManage(card)}
