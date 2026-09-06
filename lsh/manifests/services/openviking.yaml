@@ -8,8 +8,12 @@ home: '~/.openviking'
 priority: P1
 tags: [context-db, ollama, python]
 
-# 服务要回连 Ollama（localhost:11434）。系统代理开着时，
-# 没有 NO_PROXY 会把这个请求劫到代理上去 —— 本地服务探测类问题的头号坑。
+# 2026-09-06 实测校准：在 WorkBuddy 透明代理（127.0.0.1:61148）下，
+# 带不带这个 env 都一样通 —— curl 三种打法（继承代理 / --noproxy /
+# NO_PROXY env）全是 200，只差几毫秒。
+# 但 ClashX 7890 那类会劫持环回地址的代理下，缺了它本地请求就被送到
+# 代理上去了，这是本地服务排查里最容易白花半天的一类问题。
+# 保留成本为零，所以留着 —— 只是别把它当成"没有就起不来"的硬依赖。
 env:
   NO_PROXY: '127.0.0.1,localhost'
   no_proxy: '127.0.0.1,localhost'
@@ -35,6 +39,9 @@ supervisor:
        要 42s；关掉后降到 30-60s 量级（仍慢，这是本地 14B 的代价）。
 
     监管：manual —— 手工脚本拉起，没有守护进程，重启机器后要自己拉起来。
+
+    启停三条命令都在 LSH 的执行器（/bin/zsh -lc）下实测过：
+    status 输出 running/stopped、stop 后端口释放、start 后约 20s 起来。
   actions:
     start:
       cwd: '${home}'
