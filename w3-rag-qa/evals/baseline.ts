@@ -75,12 +75,37 @@ async function judge(
   return parseVerdict(text);
 }
 
+interface Checkpoint {
+  order: string[];
+  rows: Record<string, Row>;
+}
+
 async function main() {
   await ensureIndexed();
   const rows: Row[] = [];
 
+  // 断点续跑：载入已有 checkpoint（来自前次中断的运行）
+  const CK = join(here, '..', 'eval-baseline-checkpoint.json');
+  let ck: Checkpoint = {order: [], rows: {}};
+  try {
+    ck = JSON.parse(readFileSync(CK, 'utf8')) as Checkpoint;
+  } catch {
+    ck = {order: [], rows: {}};
+  }
+
   for (let i = 0; i < dataset.length; i++) {
     const q = dataset[i];
+
+    // 已完成（含前次运行的结果）→ 直接复用，跳过 LLM 调用
+    const done = ck.rows[q.id];
+    if (done) {
+      rows.push(done);
+      console.log(
+        `[${i + 1}/${dataset.length}] ${q.id} (复用 checkpoint) hit=${done.retrievalHit ?? '-'} faithful=${done.faithful} correct=${done.correct}`,
+      );
+      continue;
+    }
+
     const {answer, sources, chunks} = await answerWithRag(q.input, TOPK);
     const context = chunks
       .map((c, k) => `[${k + 1}] (${c.source})\n${c.text}`)
@@ -95,7 +120,7 @@ async function main() {
     }
 
     const v = await judge(q, answer, context);
-    rows.push({
+    const row: Row = {
       id: q.id,
       category: q.category,
       retrievalHit,
@@ -103,7 +128,12 @@ async function main() {
       correct: v.correct,
       answer,
       reason: v.reason,
-    });
+    };
+    rows.push(row);
+    // 每题后写 checkpoint，便于中断后续跑
+    ck.rows[q.id] = row;
+    ck.order = dataset.map((d) => d.id);
+    writeFileSync(CK, JSON.stringify(ck, null, 2));
     console.log(
       `[${i + 1}/${dataset.length}] ${q.id} hit=${retrievalHit ?? '-'} faithful=${v.faithful} correct=${v.correct}`,
     );

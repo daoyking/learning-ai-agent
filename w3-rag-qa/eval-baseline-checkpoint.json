@@ -1,0 +1,539 @@
+{
+  "order": [
+    "b-fact-01",
+    "b-fact-02",
+    "b-fact-03",
+    "b-fact-04",
+    "b-fact-05",
+    "b-fact-06",
+    "b-fact-07",
+    "b-fact-08",
+    "b-fact-09",
+    "b-fact-10",
+    "b-fact-11",
+    "b-fact-12",
+    "b-fact-13",
+    "b-fact-14",
+    "b-fact-15",
+    "b-fact-16",
+    "b-fact-17",
+    "b-fact-18",
+    "b-fact-19",
+    "b-fact-20",
+    "b-fact-21",
+    "b-fact-22",
+    "b-fact-23",
+    "b-fact-24",
+    "b-fact-25",
+    "b-fact-26",
+    "b-fact-27",
+    "b-fact-28",
+    "b-fact-29",
+    "b-fact-30",
+    "b-multi-01",
+    "b-multi-02",
+    "b-multi-03",
+    "b-multi-04",
+    "b-multi-05",
+    "b-multi-06",
+    "b-multi-07",
+    "b-multi-08",
+    "b-multi-09",
+    "b-multi-10",
+    "b-trap-01",
+    "b-trap-02",
+    "b-trap-03",
+    "b-trap-04",
+    "b-trap-05",
+    "b-trap-06",
+    "b-trap-07",
+    "b-trap-08",
+    "b-trap-09",
+    "b-trap-10"
+  ],
+  "rows": {
+    "b-fact-01": {
+      "id": "b-fact-01",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-02": {
+      "id": "b-fact-02",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-03": {
+      "id": "b-fact-03",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-04": {
+      "id": "b-fact-04",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-05": {
+      "id": "b-fact-05",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-06": {
+      "id": "b-fact-06",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-07": {
+      "id": "b-fact-07",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-08": {
+      "id": "b-fact-08",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-09": {
+      "id": "b-fact-09",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-10": {
+      "id": "b-fact-10",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-11": {
+      "id": "b-fact-11",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": false,
+      "correct": false,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-12": {
+      "id": "b-fact-12",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": true,
+      "correct": false,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-13": {
+      "id": "b-fact-13",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-14": {
+      "id": "b-fact-14",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-15": {
+      "id": "b-fact-15",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-16": {
+      "id": "b-fact-16",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-17": {
+      "id": "b-fact-17",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-18": {
+      "id": "b-fact-18",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": true,
+      "correct": false,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-19": {
+      "id": "b-fact-19",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-20": {
+      "id": "b-fact-20",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": true,
+      "correct": false,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-21": {
+      "id": "b-fact-21",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-22": {
+      "id": "b-fact-22",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-23": {
+      "id": "b-fact-23",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-24": {
+      "id": "b-fact-24",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-25": {
+      "id": "b-fact-25",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-26": {
+      "id": "b-fact-26",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-27": {
+      "id": "b-fact-27",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-28": {
+      "id": "b-fact-28",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-29": {
+      "id": "b-fact-29",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-fact-30": {
+      "id": "b-fact-30",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-multi-01": {
+      "id": "b-multi-01",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-multi-02": {
+      "id": "b-multi-02",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": false,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-multi-03": {
+      "id": "b-multi-03",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "",
+      "reason": "(复用前次运行结果)",
+      "resumed": true
+    },
+    "b-multi-04": {
+      "id": "b-multi-04",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": false,
+      "answer": "知识库中未提及 RAG 的具体步骤，也未说明哪一步不需要训练模型。参考资料仅指出“求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集”，但未展开 RAG 流程细节。",
+      "reason": "参考资料仅提到“求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集”，并未展开 RAG 的索引/检索/生成等步骤，因此模型回答指出资料中未提及 RAG 具体步骤是忠实于资料的；但期望要点要求说明三个阶段都不需要训练模型，模型未覆盖该要点，故不正确。"
+    },
+    "b-multi-05": {
+      "id": "b-multi-05",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "根据参考资料，Agent 的工具调用中的「本地代码执行」与前端工程师的以下经验相通：\n\n1. **TS/JS + 异步编程（async/Promise）经验**  \n   前端工程师熟悉异步流程控制，而工具调用的核心是「模型返回函数名与参数 → 本地代码执行 → 结果回灌模型」，这一过程本质上是异步调用与回调的串联，前端的 async/Promise 能力可「零门槛」衔接。【来源: frontend-to-ai.md】\n\n2. **组件化与状态管理经验**  \n   前端擅长将「工具调用可视化」「中间步骤时间线」封装为组件并管理状态，这正是本地代码执行后的结果呈现、步骤追踪、错误重试等交互所需的核心能力。【来源: frontend-to-ai.md】\n\n3. **Web API / JSON / fetch 经验**  \n   工具调用以「函数名 + 参数（JSON）」形式触发本地执行，前端工程师长期处理 JSON 数据交换、调用各类 API，对这种「结构化参数传递 + 本地执行 + 结果回传」模式天然熟悉。【来源: frontend-to-ai.md】\n\n综上，前端工程师在**异步流程编排、组件化可视化封装、JSON/API 交互**三方面的经验，与 Agent 工具调用中的「本地代码执行」环节高度相通。",
+      "reason": "模型回答完全基于参考资料，引用了 frontend-to-ai.md 中的三项能力迁移（TS/JS+异步、组件化与状态管理、Web API/JSON/fetch），并结合 agent-basics.md 中工具调用的本地执行机制进行解释，未出现资料外断言。回答覆盖了期望要点中的「Web API / JSON / fetch 接外部服务、处理返回结果的经验」，同时补充了异步编程与组件化可视化两个相关要点，内容准确且更全面。"
+    },
+    "b-multi-06": {
+      "id": "b-multi-06",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": false,
+      "answer": "知识库中未提及 ReAct 循环及其步骤，因此无法根据提供的资料回答「检索拿到片段」对应 ReAct 循环的哪一步。",
+      "reason": "模型回答指出参考资料中未提及 ReAct 循环，因此无法基于资料作答，这符合 faithful 要求（无资料外断言）。但期望要点要求说明「检索拿到片段」对应 ReAct 的 Observe 步骤，模型未覆盖该要点，故 correct 为 false。"
+    },
+    "b-multi-07": {
+      "id": "b-multi-07",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "根据参考资料，前端流式 UI 能力能提升 Agent 的以下体验，并对应护城河的核心优势：\n\n**提升的体验：**\n1. **流式打字/逐 token 输出效果** —— 天然契合 LLM 的流式生成特性，让回答实时呈现，减少用户等待焦虑 [1]。\n2. **步骤可视化（工具调用可视化、中间步骤时间线）** —— 利用组件化与状态管理优雅封装 Agent 的 Reason→Act→Observe 循环，让用户清晰看到工具调用、中间推理过程 [1]。\n3. **错误重试的优雅交互** —— 在工具调用失败或模型异常时，提供友好的重试、降级或人工介入入口，保证流程不中断 [1]。\n\n**对应护城河的一点：**\n> “同样一个 Agent，你能做出带流式打字、步骤可视化、错误重试优雅的界面，**这正是大多数算法背景同学最弱、而市场最缺的一环**。” [1]\n\n即：**前端工程师擅长的“交互体验工程化能力”（流式渲染、过程可视化、容错交互）是当前 AI 应用层（AI Application Engineer）最稀缺、最具差异化的竞争壁垒**。",
+      "reason": ""
+    },
+    "b-multi-08": {
+      "id": "b-multi-08",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "根据知识库内容，RAG「查资料再答」特别适合前端工程师做作品集，主要有以下原因：\n\n## 1. 官方建议：求职期首选 RAG，避开微调\n资料明确指出：「**求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集**」[1][2]。这意味着前端工程师不需要投入大量精力学习模型训练，用 RAG 就能快速产出有竞争力的项目。\n\n## 2. 前端核心技能与 RAG 极度契合\n前端工程师的现有技能栈天然适配 RAG 应用开发[1][2]：\n- **TS/JS + 异步编程**：调用 LLM API、串联 Agent 流程「零门槛」\n- **流式 UI 与打字机效果**：完美契合 LLM 逐 token 输出的特性\n- **组件化与状态管理**：能优雅封装「工具调用可视化」「中间步骤时间线」等 RAG 关键交互\n- **Web API / JSON / fetch**：对接模型服务、第三方工具、向量数据库毫无障碍\n\n## 3. 差异化护城河：把「查资料」过程做成可视化产品\n同样一个 RAG 应用，前端工程师能做出**带流式打字、检索步骤可视化、错误重试优雅**的界面，这正是「大多数算法背景同学最弱、而市场最缺的一环」[1][2]。RAG 的「索引→检索→生成」三步流程[3]，配上前端擅长的可视化交互，极易做出高完成度的演示项目。\n\n---\n\n**结论**：RAG 让前端工程师用熟悉的技术栈（TS/JS、流式渲染、组件化）快速落地「有检索、有引用、有交互」的 AI 应用，既符合求职「避坑指南」，又能发挥前端差异化优势，是作品集的高性价比选择。",
+      "reason": "回答完全基于提供的参考资料，引用准确，未引入资料外信息。同时覆盖了期望要点：RAG 无需训练模型（求职期避开微调）、前端 TS/Node 可串起检索→生成流程、流式 UI 呈现、门槛低易出作品集，且表述准确。"
+    },
+    "b-multi-09": {
+      "id": "b-multi-09",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "根据参考资料，前端工程师的 **「组件化与状态管理」** 能力正好适配 Agent 需要 Memory 支撑多轮对话这一点。\n\n资料中指出：前端工程师擅长的「组件化与状态管理」能 **「优雅封装『工具调用可视化』『中间步骤时间线』」**[^1]，这种状态管理经验可直接迁移到 Agent 的多轮对话上下文（Memory）维护与可视化中。\n\n[^1]: 来源: frontend-to-ai.md",
+      "reason": "The user asks: \"Agent 需要 Memory 支撑多轮，前端工程师的什么能力正好适配这一点？\" Expected answer: \"前端的组件化与状态管理能力正好用来保留/管理多轮对话历史\". The model answer says: \"前端工程师的「组件化与状态管理」能力正好适配 Agent 需要 Memory 支撑多轮对话这一点。资料中指出：前端工程师擅长的「组件化与状态"
+    },
+    "b-multi-10": {
+      "id": "b-multi-10",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": false,
+      "answer": "根据提供的三篇文档（其中 [1] 与 [2] 为同一文件），前端工程师做 AI 应用的核心优势可概括为以下三点：\n\n1. **技术栈零门槛对接 LLM 与 Agent 流程**  \n   擅长 TS/JS 异步编程（async/Promise）、Web API、JSON 与 fetch，能直接调用 LLM API、串联 Agent 工具链、接入第三方工具，无需额外学习新语言即可快速落地。  \n   —— 来源：`frontend-to-ai.md`（能力迁移第 1、4 条）\n\n2. **流式 UI 与打字机效果的天然契合**  \n   长期实践流式渲染、逐字输出动画，完美适配 LLM 逐 token 产出的流式响应，能提供极佳的用户体验。  \n   —— 来源：`frontend-to-ai.md`（能力迁移第 2 条；护城河段落）\n\n3. **组件化与状态管理构建复杂交互界面**  \n   善用组件化封装与状态管理，能优雅实现「工具调用可视化」「中间步骤时间线」「错误重试与优雅降级」等算法背景工程师最薄弱、市场最稀缺的交互环节。  \n   —— 来源：`frontend-to-ai.md`（能力迁移第 3 条；护城河段落",
+      "reason": "The answer correctly summarizes two advantages (TS/Node integration and streaming UI/componentization) from the reference materials but completely omits the third expected advantage: that front-end engineers can produce a portfolio using RA"
+    },
+    "b-trap-01": {
+      "id": "b-trap-01",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中未提及 RAG 应该用 GPT-4 来做 embedding。参考资料 [3] 仅描述了 RAG 的流程中包含「向量化（embedding）」步骤，但未指定使用何种模型进行嵌入。",
+      "reason": "模型回答准确指出知识库中未提及使用 GPT-4 做 embedding，参考资料 [3] 仅泛泛描述 RAG 流程中的向量化步骤，未指定任何具体嵌入模型，因此回答完全基于参考资料且正确处理了陷阱题。"
+    },
+    "b-trap-02": {
+      "id": "b-trap-02",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "根据提供的参考资料，**知识库中未提及 Agent 能自己训练大语言模型**。\n\n资料明确建议前端工程师转型 AI 应用开发时，**“求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集”**【1】【2】。Agent 被定义为“能自主决定调用哪些工具来完成任务的 LLM 应用”，其核心循环是 **Reason → Act → Observe**，通过**工具调用**与**记忆**来完成任务，而非训练模型【3】。",
+      "reason": "The answer correctly states that the knowledge base does not mention Agent training LLM, cites the relevant advice against self-training and the definition of Agent, and does not hallucinate."
+    },
+    "b-trap-03": {
+      "id": "b-trap-03",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**不必须学 PyTorch。**\n\n知识库明确指出，前端工程师转向 **AI 应用层（AI Application Engineer）** 时，**不要一上来啃微积分/线性代数，也不要碰模型微调/自训**，那是模型研究员的路径，ROI 低且容易劝退【1】。建议的路径是：\n\n1. 先用熟悉的 **TypeScript / Node.js 直接调用 LLM API**，快速获得正反馈；  \n2. 再按需补 Python 与基础算法；  \n3. 求职作品集用 **RAG（检索增强生成）** 等应用层技术即可，无需深度学习框架【1】。\n\n因此，PyTorch 等深度学习框架并非前端转 AI 应用开发的必修课。  \n\n**引用来源**：`frontend-to-ai.md`",
+      "reason": "模型回答准确反映了参考资料的核心观点：前端转 AI 应用层不需要先学 PyTorch 等深度学习框架，资料明确建议避开模型微调/自训路线，优先用 TS/Node 调 LLM API、做 RAG 等应用层工作。回答未引入资料外信息，正确处理了陷阱题。"
+    },
+    "b-trap-04": {
+      "id": "b-trap-04",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中**未直接对比 RAG 与微调的效果优劣**。  \n\n仅在 `frontend-to-ai.md` 中提到求职作品集准备时的建议：  \n> “求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集”  \n\n这仅是针对**前端工程师求职作品集**的实操建议，并非通用的效果对比结论。  \n\n**引用来源**：`frontend-to-ai.md`",
+      "reason": "模型回答准确指出知识库中未直接对比 RAG 与微调的效果优劣，仅引用了 frontend-to-ai.md 中针对前端工程师求职作品集的建议，并明确说明这并非通用的效果对比结论。回答完全基于提供的参考资料，无任何资料外断言或幻觉。"
+    },
+    "b-trap-05": {
+      "id": "b-trap-05",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中未提及。提供的参考资料仅涉及前端工程师转型 AI 应用开发的路径建议（[1][2]）以及 RAG（检索增强生成）的基本概念、流程与分块/重排策略（[3]），均未包含关于 bge-m3 模型的任何信息。",
+      "reason": "模型正确识别出参考资料中完全没有提及 bge-m3，明确回答「知识库中未提及」并总结了资料实际涵盖的内容，未产生任何资料外的幻觉断言，符合陷阱题的预期处理方式。"
+    },
+    "b-trap-06": {
+      "id": "b-trap-06",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中未提及 RAG 支持多少种自然语言。提供的参考资料仅介绍了 RAG 的基本概念、流程（索引、检索、生成）、分块策略和重排机制，并未涉及语言支持范围。",
+      "reason": "The model correctly states that the reference materials do not mention the number of natural languages RAG supports, and does not fabricate any information."
+    },
+    "b-trap-07": {
+      "id": "b-trap-07",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中未提及具体的向量数据库产品推荐。提供的参考资料（agent-basics.md、rag-explained.md、frontend-to-ai.md）仅在 rag-explained.md 中提到「存入向量库」这一步骤，但未列举或推荐任何具体产品（如 Pinecone、Weaviate、Milvus、Chroma、Qdrant 等）。",
+      "reason": "模型正确指出参考资料中未提及任何具体向量数据库产品，仅提到“存入向量库”这一通用步骤，未给出 Pinecone、Weaviate、Milvus、Chroma、Qdrant 等具体推荐，因此回答完全基于资料且无幻觉，陷阱题处理得当。"
+    },
+    "b-trap-08": {
+      "id": "b-trap-08",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中未提及关于 Agent 系统提示词（system prompt）的具体内容。提供的参考资料仅涵盖了 RAG 流程、Agent 基础概念（ReAct 循环、工具调用、记忆）以及前端工程师转型 AI 应用开发的建议，并未包含系统提示词的编写指南或示例。",
+      "reason": "模型正确识别出参考资料中不包含 Agent 系统提示词的编写指南，明确声明「知识库中未提及」而非编造内容，符合陷阱题要求。"
+    },
+    "b-trap-09": {
+      "id": "b-trap-09",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中未提及前端转 AI 的平均薪资信息。提供的参考资料仅涵盖前端工程师转型 AI 应用开发的能力迁移建议、避坑指南、护城河分析以及 RAG 技术原理，未包含任何薪资数据。",
+      "reason": "模型正确指出参考资料中完全没有薪资数据，明确声明「知识库中未提及」，未编造任何数字或范围，符合陷阱题要求。"
+    },
+    "b-trap-10": {
+      "id": "b-trap-10",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "知识库中未提及如何将 RAG 部署到生产环境的相关内容。\n\n参考资料 [1][2] 仅建议前端工程师用 RAG 做作品集，[3] 仅解释 RAG 的基本原理、流程、分块与重排，均未涉及生产环境部署细节。",
+      "reason": "模型准确指出知识库中未包含 RAG 生产环境部署相关内容，并正确概括了参考资料 [1][2][3] 的实际涵盖范围（前端转型建议、RAG 基本原理与流程），未添加任何资料外断言，符合陷阱题要求。"
+    }
+  }
+}

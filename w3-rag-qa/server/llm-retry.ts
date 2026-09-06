@@ -71,9 +71,12 @@ export async function generateWithRetry(
       await new Promise((resolve) => setTimeout(resolve, 1500 * attempt));
     }
   }
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('generateWithRetry: 重试耗尽，最后一次调用返回空响应');
+  // 不再抛出：重试耗尽时返回空串，由调用方记为「模型空响应」失败并继续，
+  // 避免单题空响应中断整轮评测（基线评测需跑完全部 50 题再出报告）。
+  console.warn(
+    `  ⚠️ 第 ${maxAttempts} 次重试后仍失败（${lastError instanceof Error ? lastError.message.split('\n')[0] : '空响应'}），记为空响应继续。`,
+  );
+  return '';
 }
 
 /** 读取 SSE 流，拼接所有 delta.content，遇到 `data: [DONE]` 结束。 */
