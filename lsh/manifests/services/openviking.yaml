@@ -1,0 +1,123 @@
+schema: lsh.service/v1
+id: openviking
+name: OpenViking
+description: 上下文数据库 —— viking:// 统一管理记忆/资源/技能（本地实例，1933）
+category: rag
+icon: ':openviking:'
+home: '~/.openviking'
+priority: P1
+tags: [context-db, ollama, python]
+
+# 服务要回连 Ollama（localhost:11434）。系统代理开着时，
+# 没有 NO_PROXY 会把这个请求劫到代理上去 —— 本地服务探测类问题的头号坑。
+env:
+  NO_PROXY: '127.0.0.1,localhost'
+  no_proxy: '127.0.0.1,localhost'
+
+detect:
+  ports: [1933]
+  process: 'openviking-server'
+  paths: ['~/.openviking/ov.conf']
+
+supervisor:
+  kind: script
+  detach: setsid
+  supervision:
+    check: manual
+  note: |
+    2026-09-06 部署：装在 ~/.openviking/venv（uv 建的独立 venv，纯 wheel
+    无编译，30s 装完），配置 ~/.openviking/ov.conf，模型全走本地 Ollama ——
+    embedding=bge-m3(1024维)、VLM=qwen3:14b。零 API 成本。
+
+    两个必须知道的点：
+    1. 必须 setsid 脱离会话。这是 uvicorn 前台进程，nohup 会被回收。
+    2. vlm 必须带 thinking:false。qwen3 默认开思考模式，生成一条 L0 摘要
+       要 42s；关掉后降到 30-60s 量级（仍慢，这是本地 14B 的代价）。
+
+    监管：manual —— 手工脚本拉起，没有守护进程，重启机器后要自己拉起来。
+  actions:
+    start:
+      cwd: '${home}'
+      cmd: '~/.openviking/venv/bin/openviking-server --host 127.0.0.1 --port 1933'
+      timeout_ms: 45000
+      wrap: setsid
+      note: '启动约 12-22s（要挂载 viking:// 文件系统并初始化向量库）'
+    stop:
+      cmd: "pkill -f 'openviking-server --host 127.0.0.1 --port 1933'"
+      timeout_ms: 15000
+      danger: confirm
+    status:
+      cmd: "pgrep -f 'openviking-server --host 127.0.0.1 --port 1933' >/dev/null && echo running || echo stopped"
+      timeout_ms: 5000
+
+health:
+  l1: { type: tcp, port: 1933, timeout_ms: 2000 }
+  l2:
+    type: http
+    url: 'http://127.0.0.1:1933/health'
+    expect_status: 200
+    expect_body: '"status"\s*:\s*"ok"'
+    timeout_ms: 8000
+  l3:
+    - id: ready-deps
+      desc: '/ready 逐个报依赖状态：vectordb / embedding / ollama 都得是 ok'
+      type: http_json
+      url: 'http://127.0.0.1:1933/ready'
+      jq: 'checks'
+      assert: "embedding == 'ok' && ollama == 'ok' && vectordb == 'ok'"
+      timeout_ms: 15000
+      interval_ms: 300000
+      cost: free
+      note: |
+        这个端点自带依赖自检，比 /health 有信息量得多 ——
+        /health 只说 uvicorn 活着，/ready 会说 Ollama 和向量库还在不在。
+        本机 dev 模式下 api_key_manager 恒为 not_configured，不参与断言。
+    - id: write-recall
+      desc: '真的写一条资源再检索回来 —— 三部件任一环断了 /health 都还是 200'
+      type: script
+      script: probes/openviking-write-recall.mjs
+      assert: 'hit'
+      timeout_ms: 450000
+      interval_ms: 900000
+      # 默认不跟着全量体检跑：本机实测写入→可检索要 3-5 分钟，
+      # 一次全量体检会被它单独拖到不可用的时长。想验就在卡片上点「深检」。
+      enabled: false
+      cost: cheap
+      note: |
+        唯一能证明「真的能用」的一条。Ollama(bge-m3) 做向量、
+        Ollama(qwen3:14b) 做 L0/L1 摘要、viking:// 索引做检索 ——
+        断任何一环，服务照样 200，检索却一条都出不来。
+
+        ⚠️ 慢，而且慢在模型上：一个资源要触发 3 次 VLM（文件摘要 +
+        父目录 .abstract + .overview），14B 单次 40s 起，排队后实测
+        3-5 分钟。所以 enabled: false —— 全量体检跳过它，需要时手动深检。
+        想让它进常规体检，就把 VLM 换成小模型（qwen3:4b 量级），
+        或者接受全量体检多花几分钟后把这条改回 enabled: true。
+
+        判据踩过的三个坑，都记在探针注释里：
+        ① 别拿 fs/ls 的 abstract 当完成信号，它一直为空而索引早已就绪；
+        ② 命中判据不能用标记词匹配 uri，标记词只在文件内容里；
+        ③ 固定 uri 会被上一轮的旧索引满足（154ms 就"通过"的假活），
+           必须每轮换唯一 uri。
+
+depends_on: [ollama]
+provides: [context-db]
+
+config:
+  files: ['~/.openviking/ov.conf']
+  readonly: false
+
+logs:
+  - kind: file
+    path: '~/.openviking/server.log'
+    label: server
+    ignore_patterns: ['pathlock lease automatically refreshed']
+  - kind: file
+    path: '~/.openviking/server.err.log'
+    label: stderr
+
+playbooks: []
+
+danger:
+  stop_requires_confirm: true
+  impact: 'Odysseus / 任何接了 OpenViking MCP 的 Agent 会立刻失去上下文召回'

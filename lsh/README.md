@@ -5,7 +5,7 @@ macOS 上的**本地自托管 AI 服务控制中心**。
 不是端口监控器——是能回答"这个服务**真的能用吗**"的语义级控制中心。
 
 ```
-本机实况：49 个监听端口 · 10 个纳管服务 · 9 个在线（含 1 个远程托管）
+本机实况：49 个监听端口 · 11 个纳管服务 · 10 个在线（含 1 个远程托管）
 ```
 
 ---
@@ -42,7 +42,7 @@ lsh/
 │   ├── schema/
 │   │   ├── service-manifest.schema.json   # 服务描述格式（JSON Schema 2020-12）
 │   │   └── playbook.schema.json           # 排障剧本格式
-│   ├── services/*.yaml                    # 10 个服务的声明式描述（含 1 个远程托管）
+│   ├── services/*.yaml                    # 11 个服务的声明式描述（含 1 个远程托管）
 │   └── playbooks/*.yaml                   # 13 个排障剧本
 ├── src/                                   # React 前端
 ├── src-tauri/                             # Rust 能力层
@@ -113,6 +113,46 @@ health:
 这里的 200 是零信息量的。顺带暴露了本项目自己的一个 bug：
 `run_l2_probe` 此前把 `expect_body` 当成 `-d` 请求体发出去了，
 对响应内容一个字都不校验 —— 这种壳会一直绿着。已修。
+
+### 本地部署 OpenViking（2026-09-06 实测，零 API 成本）
+
+上下文数据库，`viking://` 统一管理记忆/资源/技能。默认端口 **1933**。
+
+```bash
+uv venv ~/.openviking/venv --python 3.13
+VIRTUAL_ENV=~/.openviking/venv uv pip install --python ~/.openviking/venv/bin/python openviking
+# 写 ~/.openviking/ov.conf（见下），然后
+openviking-server doctor     # 配置文件 / Python / 引擎 / embedding / VLM / 磁盘逐个体检
+```
+
+三个必须知道的点：
+
+1. **embedding 的 `api_base` 要带 `/v1`** —— 填 `http://localhost:11434` 会
+   得到 `404 page not found`（OpenAI SDK 自己拼路径）。带 `/v1` 后
+   `ollama/bge-m3 dimension=1024 probe ok`。
+2. **VLM 必须 `thinking: false`** —— qwen3 默认开思考模式，生成一条 L0 摘要
+   要 42s，链路直接卡住。
+3. **服务端拒绝本地路径**：`add_resource` 传宿主机路径会返回
+   `PERMISSION_DENIED`，必须先 `POST /api/v1/resources/temp_upload` 拿
+   `temp_file_id` 再入库。
+
+配置（全走本地 Ollama，不花一分钱）：
+
+```json
+{
+  "embedding": { "dense": { "provider": "ollama", "model": "bge-m3",
+                            "api_base": "http://localhost:11434/v1", "dimension": 1024 } },
+  "vlm": { "provider": "openai", "model": "qwen3:14b",
+           "api_base": "http://localhost:11434/v1", "api_key": "ollama-local",
+           "thinking": false }
+}
+```
+
+`/ready` 比 `/health` 有用得多 —— 它自带依赖自检：
+
+```json
+{"status":"ready","checks":{"agfs":{...},"vectordb":"ok","embedding":"ok","ollama":"ok"}}
+```
 
 ### dsh 的 TTY 问题（V0.1 已解决）
 
