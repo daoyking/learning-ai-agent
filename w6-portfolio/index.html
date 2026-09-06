@@ -172,11 +172,12 @@
   .card-foot .run { font-family: var(--mono); font-size: 12px; color: var(--text-faint); }
 
   /* PRACTICE */
-  .practice { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .practice { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
   @media (max-width: 760px) { .practice { grid-template-columns: 1fr; } }
   .prac-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow); }
   .prac-card .ic { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 20px; margin-bottom: 14px; }
   .prac-card.green .ic { background: var(--accent-2-soft); color: var(--accent-2); }
+  .prac-card.amber .ic { background: rgba(245,158,11,.14); color: #f59e0b; }
   .prac-card h3 { font-size: 18px; font-weight: 750; }
   .prac-card p { color: var(--text-soft); font-size: 14.5px; margin-top: 8px; }
   .prac-card ul { margin: 14px 0 0; padding-left: 18px; color: var(--text-soft); font-size: 14px; }
@@ -395,8 +396,8 @@
       <div class="card reveal">
         <div class="card-top"><span class="badge green">W7 · 系统客户端</span><span>Tauri 2 + Rust</span></div>
         <h3>Local Service Hub：本地 AI 服务总管</h3>
-        <p class="pitch">把本机 9 个自托管 AI 服务（Ollama / OmniRoute / Odysseus / SearXNG…）统一纳管。差异化 = 三级健康探针（L1 端口 / L2 HTTP / L3 语义）抓「假活」，加「监管状态」维度抓「跑着但无人接管」。前端工程师做系统工具的护城河：真实扫描本机、把风险可视化。</p>
-        <div class="tags"><span class="tag">Tauri 2</span><span class="tag">Rust</span><span class="tag">端口扫描</span><span class="tag">假活检测</span><span class="tag">监管态</span></div>
+        <p class="pitch">把本机 11 个自托管 AI 服务（Ollama / OmniRoute / SearXNG / OpenViking…）统一纳管，含 1 个云端服务的只读观测。核心是抓「假活」——三级探针逐层加码：L1 端口在听、L2 响应体对得上、L3 真的写一条数据再查回来。再加「监管状态」维度，标出跑着但崩了没人拉起的服务。15 个排障剧本文档化真实踩过的坑。</p>
+        <div class="tags"><span class="tag">Tauri 2</span><span class="tag">Rust</span><span class="tag">三级探针</span><span class="tag">假活检测</span><span class="tag">排障剧本</span></div>
         <div class="card-foot">
           <a href="https://github.com/daoyking/learning-ai-agent/tree/main/lsh">README →</a>
           <span class="run">cargo tauri dev</span>
@@ -411,8 +412,8 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <div class="sec-tag">Engineering Practices</div>
-      <h2>让 Agent 从「玩具」变「产品」的两件事</h2>
-      <p>多数练手项目止步于「能跑」，而工程化交付需要质量护栏。W5 把评测与可观测做成可复用工具箱，并嫁接到前三个作品上。</p>
+      <h2>让 Agent 从「玩具」变「产品」的三件事</h2>
+      <p>多数练手项目止步于「能跑」，而工程化交付需要质量护栏与可复用性。W5 把评测与可观测做成可复用工具箱并嫁接到前三个作品上；W7 进一步把踩过的坑沉淀成机器可执行的剧本——同一个坑不踩第二次。</p>
     </div>
     <div class="practice">
       <div class="prac-card reveal">
@@ -435,6 +436,17 @@
           <li><b>零依赖 Tracer</b>：<code>span()/event()/report()</code> 离线即可跑</li>
           <li><b>标准对接</b>：AI SDK <code>telemetry</code> → OpenTelemetry / OTLP</li>
           <li><b>生产可迁</b>：Langfuse / LangSmith / Jaeger 直接消费</li>
+        </ul>
+      </div>
+      <div class="prac-card amber reveal">
+        <div class="ic">🧰</div>
+        <h3>排障剧本 Runbook</h3>
+        <p>同一个坑踩第二次就是浪费。把「症状 → 诊断 → 根因 → 修复」写成声明式剧本，让机器替你跑诊断。</p>
+        <ul>
+          <li><b>声明式触发</b>：探针失败 / 日志正则 / 命令输出 + <code>when</code> 表达式</li>
+          <li><b>先取证后下结论</b>：diagnose 全只读，conclude 按证据排序推根因</li>
+          <li><b>修复分档</b>：manual 只给建议，assisted 才动手，失败自动 rollback</li>
+          <li><b>沉淀即资产</b>：15 个剧本均为真踩过的坑（端口冒名、代理幽灵、摘要卡死…）</li>
         </ul>
       </div>
     </div>
@@ -610,6 +622,32 @@
           <a href="eval-reports/w4-resume-scorer.md">完整报告 →</a>
         </div>
       </div>
+    </div>
+
+    <div class="reg-block">
+      <div class="reg-head">
+        <div class="sec-tag">W7 · 真机扫描快照</div>
+        <h3>LSH 在我自己机器上一次真实扫描的结果</h3>
+        <p>不是示意图，是 <code>lsof -nP -iTCP -sTCP:LISTEN</code> 真扫出来的。最有价值的不是「9 个在线」，而是它顺带标出的那 5 个<b>跑着但无人监管</b>的服务——崩溃后不会自动拉起，重启后需要手动恢复。这类风险肉眼看不见。</p>
+      </div>
+      <div class="reg-grid">
+        <div class="reg-card reveal">
+          <div class="reg-top"><span class="badge green">纳管</span></div>
+          <div class="reg-n">11<span> 个</span></div>
+          <div class="reg-l">服务 · 9 个在线 · 1 个远程托管</div>
+        </div>
+        <div class="reg-card reveal">
+          <div class="reg-top"><span class="badge green">语义探针</span></div>
+          <div class="reg-n">17<span> 条</span></div>
+          <div class="reg-l">L3 探针 · 真发请求验证「真的能用」</div>
+        </div>
+        <div class="reg-card reveal">
+          <div class="reg-top"><span class="badge">隐藏风险</span></div>
+          <div class="reg-n">5<span> 个</span></div>
+          <div class="reg-l">运行中但无人监管 · 崩溃即永久停机</div>
+        </div>
+      </div>
+      <div class="evid-note">✅ <b>真机数据</b>：由 <code>lsh</code> 的 <code>node scripts/snapshot.mjs</code> 在本机实跑生成（15 个排障剧本、17 条 L3 探针同源于此）。<br>「假活」是怎么抓到的：某次扫描里 8888 端口在听，AnythingLLM 被标成运行中——实际占着端口的是 Unsloth Studio。只看端口就会误判，所以探针要校验进程归属、要校验响应体、要真的写一条数据再查回来。</div>
     </div>
   </div>
 </section>
