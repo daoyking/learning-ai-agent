@@ -468,7 +468,9 @@ fn build_card(m: &ServiceManifest, ports: &[PortEntry]) -> ServiceCard {
         probe_ms: started.elapsed().as_millis() as u64,
         port_conflict,
         playbooks: m.playbooks.clone(),
-        l3_count: m.health.l3.len(),
+        // 全量体检会跳过 enabled:false 的探针，这里数的是"实际会跑几条" ——
+        // 否则 UI 上的 n/N 永远差几条，看起来像有探针漏报了
+        l3_count: m.health.l3.iter().filter(|p| p.enabled).count(),
         log_count: m.logs.len(),
         link: m.link.clone(),
         // 只有 remote 在扫描阶段就跑过 L2；其余服务仍是用户点击时才跑

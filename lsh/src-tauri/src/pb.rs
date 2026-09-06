@@ -952,6 +952,24 @@ fn run_probe_jobs(
     slots.into_iter().flatten().collect()
 }
 
+/// 把 manifest 摊平成"全量体检要跑的任务列表"。
+///
+/// `enabled: false` 的探针在这里被跳过 —— 它存在的意义就是让"很贵/很慢"
+/// 的探针（OpenViking 的写入-检索在本机 14B 下要 3-5 分钟）不拖垮全量体检。
+/// 想跑它们，请在卡片上点「深检」（run_service_probes_with 不过滤 enabled）。
+fn all_enabled_jobs(manifests: &[crate::model::ServiceManifest]) -> Vec<(String, String, Option<String>)> {
+    manifests
+        .iter()
+        .flat_map(|m| {
+            m.health
+                .l3
+                .iter()
+                .filter(|p| p.enabled)
+                .map(move |p| (m.id.clone(), p.id.clone(), p.desc.clone()))
+        })
+        .collect()
+}
+
 pub fn run_all_probes() -> Result<Vec<ProbeRun>, String> {
     run_all_probes_with(None)
 }
@@ -962,16 +980,7 @@ pub fn run_all_probes_with(
 ) -> Result<Vec<ProbeRun>, String> {
     let manifests = registry::load_manifests()?;
 
-    // 摊平成任务列表，带上 desc 供 UI 展示「这个探针到底在验什么」
-    let jobs: Vec<(String, String, Option<String>)> = manifests
-        .iter()
-        .flat_map(|m| {
-            m.health
-                .l3
-                .iter()
-                .map(move |p| (m.id.clone(), p.id.clone(), p.desc.clone()))
-        })
-        .collect();
+    let jobs = all_enabled_jobs(&manifests);
 
     Ok(run_probe_jobs(&jobs, on_progress))
 }
@@ -995,6 +1004,9 @@ pub fn run_service_probes_with(
         .find(|m| m.id == service)
         .ok_or_else(|| format!("未找到服务 {service}"))?;
 
+    // 与全量体检相反：这里**不**过滤 enabled。
+    // 用户点的是"把这个服务查清楚"，被声明为昂贵的那几条恰恰最该跑 ——
+    // 全量跳过是出于时长，单服务深检不存在这个顾虑。
     let jobs: Vec<(String, String, Option<String>)> = m
         .health
         .l3
@@ -2338,6 +2350,29 @@ mod tests {
         assert!(!truthy(
             &eval_expr("false and results == 0", &v).unwrap()
         ));
+    }
+
+    #[test]
+    fn all_enabled_jobs_skips_disabled_probes() {
+        // enabled:false 是给"贵/慢"探针留的逃生口。OpenViking 的写入-检索
+        // 在本机 14B 下要 3-5 分钟，绝不能进全量体检 —— 但用户点「深检」
+        // 时必须还能跑到（run_service_probes_with 不过滤）。
+        let yaml = r#"
+schema: lsh.service/v1
+id: svc-x
+name: X
+category: rag
+supervisor: { kind: script }
+health:
+  l3:
+    - id: fast
+    - id: slow
+      enabled: false
+"#;
+        let m: crate::model::ServiceManifest = serde_yaml::from_str(yaml).unwrap();
+        let jobs = all_enabled_jobs(&[m]);
+        assert_eq!(jobs.len(), 1, "禁用的探针必须被全量体检跳过");
+        assert_eq!(jobs[0].1, "fast");
     }
 
     #[test]

@@ -253,7 +253,8 @@ async function buildCard(m, ports) {
     probe_ms: 0,
     port_conflict: portConflict,
     playbooks: m.playbooks ?? [],
-    l3_count: (m.health?.l3 ?? []).length,
+    // 与 Rust 侧一致：全量体检跳过 enabled:false，这里也只数会跑的那些
+    l3_count: (m.health?.l3 ?? []).filter((p) => p.enabled !== false).length,
     log_count: (m.logs ?? []).length,
     link: m.link ?? null,
     l2_status: l2Status,
