@@ -78,6 +78,51 @@ function parsePort(addr) {
   return Number.isFinite(p) ? p : null
 }
 
+/**
+ * 完整命令行。lsof 的 `-F c` 只给进程名（如 python3.13），
+ * 认不出「是谁在占这个端口」—— 必须带参数才能区分。
+ *
+ * 与 scanner::full_command_of 同语义：拿不到就返回空串，调用方降级放行。
+ */
+const fullCommandCache = new Map()
+function fullCommandOf(pid) {
+  if (fullCommandCache.has(pid)) return fullCommandCache.get(pid)
+  let out = ''
+  try {
+    out = execFileSync('ps', ['-ww', '-o', 'command=', '-p', String(pid)], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    out = '' // ps 被沙箱禁掉时（如受管 shell）走这里
+  }
+  fullCommandCache.set(pid, out)
+  return out
+}
+
+/**
+ * 端口占用者是不是 manifest 声明的那个服务（detect.process）。
+ *
+ * 与 scanner::command_matches 同语义，包括降级策略：**判不了就放行**。
+ * 误把在跑的服务判成「端口被别人占了」，比漏判一次冒名更糟 ——
+ * 前者会让用户去查一个根本不存在的问题。
+ *
+ * @param {string} pattern 正则
+ * @param {string} command lsof 给的进程名
+ * @param {string} fullCommand 含参数的完整命令行（可能为空）
+ */
+function commandMatches(pattern, command, fullCommand) {
+  let re
+  try {
+    re = new RegExp(pattern)
+  } catch {
+    return true // 正则写错：不因此把服务判死
+  }
+  if (re.test(command)) return true
+  if (!fullCommand) return true
+  return re.test(fullCommand)
+}
+
 function expandHome(p) {
   if (!p) return p
   if (p === '~') return homedir()
@@ -206,17 +251,41 @@ async function buildCard(m, ports) {
   for (const candidate of m.detect?.ports ?? []) {
     const hit = ports.find((p) => p.port === candidate)
     if (hit) {
-      listeningPort = hit.port
-      pid = hit.pid
-      process = hit.command
+      // 端口在听，还得确认是**我们**的进程在听。只看端口会把别人的服务
+      // 认成自己人：2026-09-06 实测 8888 被 Unsloth Studio 占着，AnythingLLM
+      // 却被标成「运行中」—— 应用根本没启动。与 commands.rs::build_card 同逻辑。
+      const pattern = m.detect?.process
+      const mine = pattern
+        ? commandMatches(pattern, hit.command, fullCommandOf(hit.pid))
+        : true
+      if (mine) {
+        listeningPort = hit.port
+        pid = hit.pid
+        process = hit.command
+      } else {
+        // 冒名占用：算冲突，不算运行中。展示完整命令行，方便一眼认出是谁
+        const full = fullCommandOf(hit.pid)
+        portConflict = {
+          port: hit.port,
+          command: (full || hit.command).slice(0, 120),
+          pid: hit.pid,
+        }
+      }
       break
     }
   }
 
-  if (listeningPort == null && declared != null) {
+  // 声明的端口被别人占着（我们自己的进程一个都没起来）。
+  // 注意别覆盖上一分支：那里已经记录了完整命令行，这里只有 lsof 的短进程名。
+  if (listeningPort == null && portConflict == null && declared != null) {
     const owner = ports.find((p) => p.port === declared)
     if (owner) {
-      portConflict = { port: owner.port, command: owner.command, pid: owner.pid }
+      const full = fullCommandOf(owner.pid)
+      portConflict = {
+        port: owner.port,
+        command: (full || owner.command).slice(0, 120),
+        pid: owner.pid,
+      }
     }
   }
 

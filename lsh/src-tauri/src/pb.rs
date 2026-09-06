@@ -2396,8 +2396,9 @@ health:
     #[test]
     fn loader_parses_all_playbooks() {
         let books = load_playbooks().expect("加载剧本失败");
-        // 仓库内置 13 个剧本
-        assert_eq!(books.len(), 13, "应有 13 个剧本，实际 {:?}", books.len());
+        // 只断言下界，不锁死个数 —— 每加一个剧本就要改一次数字的测试，
+        // 会把"加排障经验"这件事变成负担，然后人们就不加了。
+        assert!(books.len() >= 13, "剧本数不该变少，实际 {:?}", books.len());
         // 关键剧本必须在
         for id in [
             "omniroute-ghost-proxy",
@@ -2406,6 +2407,19 @@ health:
             "dsh-duplicate-loader",
         ] {
             assert!(books.iter().any(|b| b.id == id), "缺少剧本 {id}");
+        }
+        // 每条剧本的 when 表达式语法必须能解析 —— 写错了会在 UI 上静默退化成
+        // "这条剧本从不触发"，比直接报错难查得多。
+        // 只验语法（lex + parse），不求值：变量到真正运行时才存在。
+        for b in &books {
+            for c in b.trigger.any_of.iter().chain(b.trigger.all_of.iter()) {
+                if let Some(w) = &c.when {
+                    let ok = lex(w)
+                        .map(|toks| Parser { toks, pos: 0 }.parse_program().is_ok())
+                        .unwrap_or(false);
+                    assert!(ok, "剧本 {} 的 when 表达式语法错误: {w}", b.id);
+                }
+            }
         }
     }
 

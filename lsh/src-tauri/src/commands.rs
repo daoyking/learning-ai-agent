@@ -394,13 +394,22 @@ fn build_card(m: &ServiceManifest, ports: &[PortEntry]) -> ServiceCard {
         }
     }
 
-    // 端口被占但进程不是我们认识的 → 记为冲突
-    if listening_port.is_none() {
+    // 端口被占但进程不是我们认识的 → 记为冲突。
+    //
+    // 注意别覆盖上一分支：那里已经记了完整命令行（`ps -ww -o command=`），
+    // 这里只有 lsof 给的进程名（如 python3.13），覆盖掉会让"谁占了这个端口"
+    // 这条最有价值的线索退化成认不出来的短名。
+    if listening_port.is_none() && port_conflict.is_none() {
         if let Some(port) = declared {
             if let Some(owner) = scanner::who_owns(port) {
+                let full = scanner::full_command_of(owner.pid);
                 port_conflict = Some(PortConflict {
                     port: owner.port,
-                    command: owner.command.clone(),
+                    command: if full.is_empty() {
+                        owner.command.clone()
+                    } else {
+                        full.chars().take(120).collect()
+                    },
                     pid: owner.pid,
                 });
             }
