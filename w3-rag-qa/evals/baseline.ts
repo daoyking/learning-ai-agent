@@ -14,6 +14,7 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {ensureIndexed, answerWithRag} from '../server/rag-baseline.js';
+import {answerWithRagStage2} from '../server/rag-stage2.js';
 import {retrieve} from '../server/rag.js';
 import {generateWithRetry} from '../server/llm-retry.js';
 
@@ -82,10 +83,12 @@ interface Checkpoint {
 
 async function main() {
   await ensureIndexed();
+  const chain = process.env.RAG_CHAIN === 'stage2' ? 'stage2' : 'stage1';
+  const answerFn = chain === 'stage2' ? answerWithRagStage2 : answerWithRag;
   const rows: Row[] = [];
 
-  // 断点续跑：载入已有 checkpoint（来自前次中断的运行）
-  const CK = join(here, '..', 'eval-baseline-checkpoint.json');
+  // 断点续跑：载入已有 checkpoint（按 chain 区分，避免阶段二复用阶段一结果）
+  const CK = join(here, '..', `eval-${chain}-checkpoint.json`);
   let ck: Checkpoint = {order: [], rows: {}};
   try {
     ck = JSON.parse(readFileSync(CK, 'utf8')) as Checkpoint;
@@ -106,7 +109,7 @@ async function main() {
       continue;
     }
 
-    const {answer, sources, chunks} = await answerWithRag(q.input, TOPK);
+    const {answer, sources, chunks} = await answerFn(q.input, TOPK);
     const context = chunks
       .map((c, k) => `[${k + 1}] (${c.source})\n${c.text}`)
       .join('\n\n');
@@ -152,8 +155,12 @@ async function main() {
   const overallFaith = rate(rows, (r) => r.faithful);
   const overallCorrect = rate(rows, (r) => r.correct);
 
+  const chainLabel =
+    chain === 'stage2'
+      ? '阶段二（检索重排 + 自分解作答）'
+      : '阶段一（最小 RAG 链）';
   const md =
-    `# W3 RAG 阶段一基线评测报告（最小 RAG 链）\n\n` +
+    `# W3 RAG ${chainLabel} 评测报告\n\n` +
     `- 题数：${rows.length}（事实 ${cat('fact').length} / 多跳 ${cat('multihop').length} / 陷阱 ${cat('trap').length}）\n` +
     `- 检索命中率(precision@${TOPK})：${pct(overallRetrieval)}\n` +
     `- 忠实率：${pct(overallFaith)}\n` +
@@ -172,10 +179,10 @@ async function main() {
       )
       .join('\n');
 
-  writeFileSync(join(here, '..', 'eval-baseline-report.md'), md);
+  writeFileSync(join(here, '..', `eval-${chain}-report.md`), md);
   console.log('\n=== 汇总 ===');
   console.log(md.split('\n').slice(0, 8).join('\n'));
-  console.log(`\n报告已写入 eval-baseline-report.md`);
+  console.log(`\n报告已写入 eval-${chain}-report.md`);
 }
 
 main().catch((e) => {

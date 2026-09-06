@@ -13,6 +13,8 @@ import 'dotenv/config';
 export interface GenerateOpts {
   system: string;
   prompt: string;
+  /** 可选：覆盖默认 max_tokens（重排等短输出场景用更小值省时）。 */
+  maxTokens?: number;
 }
 
 /**
@@ -45,7 +47,7 @@ export async function generateWithRetry(
             {role: 'system', content: opts.system},
             {role: 'user', content: opts.prompt},
           ],
-          max_tokens: 1024,
+          max_tokens: opts.maxTokens ?? 1024,
           temperature: 0,
           stream: true,
         }),
