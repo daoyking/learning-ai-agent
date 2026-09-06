@@ -15,6 +15,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {ensureIndexed, answerWithRag} from '../server/rag-baseline.js';
 import {answerWithRagStage2} from '../server/rag-stage2.js';
+import {answerWithRagStage2b} from '../server/rag-stage2b.js';
 import {retrieve} from '../server/rag.js';
 import {generateWithRetry} from '../server/llm-retry.js';
 
@@ -83,8 +84,13 @@ interface Checkpoint {
 
 async function main() {
   await ensureIndexed();
-  const chain = process.env.RAG_CHAIN === 'stage2' ? 'stage2' : 'stage1';
-  const answerFn = chain === 'stage2' ? answerWithRagStage2 : answerWithRag;
+  const chain = process.env.RAG_CHAIN || 'stage1';
+  const answerFn =
+    chain === 'stage2'
+      ? answerWithRagStage2
+      : chain === 'stage2b'
+        ? answerWithRagStage2b
+        : answerWithRag;
   const rows: Row[] = [];
 
   // 断点续跑：载入已有 checkpoint（按 chain 区分，避免阶段二复用阶段一结果）
@@ -158,7 +164,9 @@ async function main() {
   const chainLabel =
     chain === 'stage2'
       ? '阶段二（检索重排 + 自分解作答）'
-      : '阶段一（最小 RAG 链）';
+      : chain === 'stage2b'
+        ? '阶段二b（子问题拆解 + 严格引用）'
+        : '阶段一（最小 RAG 链）';
   const md =
     `# W3 RAG ${chainLabel} 评测报告\n\n` +
     `- 题数：${rows.length}（事实 ${cat('fact').length} / 多跳 ${cat('multihop').length} / 陷阱 ${cat('trap').length}）\n` +
