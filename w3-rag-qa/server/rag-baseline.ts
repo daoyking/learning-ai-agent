@@ -10,9 +10,8 @@
 // 若 .env 指向带 embedding 的本地 Ollama(bge-m3) 也可无缝替换 server/embed.ts。
 
 import 'dotenv/config';
-import {generateText} from 'ai';
 import {ingest, retrieve} from './rag.js';
-import {createModel} from './model.js';
+import {generateWithRetry} from './llm-retry.js';
 
 let indexed = false;
 
@@ -43,8 +42,7 @@ export async function answerWithRag(query: string, topK = 3): Promise<RagAnswer>
   const context = chunks
     .map((c, i) => `[${i + 1}] (来源: ${c.source})\n${c.text}`)
     .join('\n\n');
-  const {text} = await generateText({
-    model: createModel(),
+  const text = await generateWithRetry({
     system:
       '你是基于本地知识库的问答助手。只使用下方「参考资料」作答，严禁编造资料之外的信息。' +
       '若资料未提及该问题，必须明确说明「知识库中未提及」。回答用中文，并注明引用来源文件名。',

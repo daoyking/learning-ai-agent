@@ -13,10 +13,9 @@ import 'dotenv/config';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {generateText} from 'ai';
 import {ensureIndexed, answerWithRag} from '../server/rag-baseline.js';
 import {retrieve} from '../server/rag.js';
-import {createModel} from '../server/model.js';
+import {generateWithRetry} from '../server/llm-retry.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TOPK = 3;
@@ -72,7 +71,7 @@ async function judge(
     `用户问题：${q.input}\n` +
     (isTrap ? '' : `期望要点：${q.expect}\n`) +
     `参考资料：\n${context}\n\n模型回答：\n${answer}`;
-  const {text} = await generateText({model: createModel(), system: sys, prompt});
+  const text = await generateWithRetry({system: sys, prompt});
   return parseVerdict(text);
 }
 
