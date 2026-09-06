@@ -5,6 +5,14 @@
 - 忠实率：66%
 - 回答正确率：56%
 
+> ⚠️ **评测可靠性（重要）**：本阶段有 **9/50 题（18%）的评审判定在 3 次重试后仍返回非 JSON**（免费模型 `auto/best-free` 回显了 judge 的 system prompt），无法判定，按 false 计。因此上述三项为**下界**，真实区间如下：
+> - 忠实率 ∈ [66%, 84%]（若 9 题全为 true）
+> - 回答正确率 ∈ [56%, 74%]
+>
+> 即便取上界，忠实率 84% < 阶段一 90%、正确率 74% < 阶段一 76% → **阶段二b 忠实度确定性劣于阶段一，正确率上界仍略低于阶段一**。
+> 多跳：10 题中有 **3 题模型在重提示下直接反问 / 自拆未被问的子问题（确认真实失败）**，4 题判定失败未决，仅 3 题可判（忠实 1/3、正确 1/3）→ 多跳崩塌为真实退化，非噪声。
+> 注：`auto/best-free` 的 judge 自身不稳定（18% 判定失败），阶段一 / 二数字共享此脆弱性，三阶段均作近似读。
+
 ## 按类别
 
 | 类别 | 题数 | 检索命中 | 忠实率 | 正确率 |
@@ -64,7 +72,7 @@ First, let's analyze  |
 | 40 | b-multi-10 | multihop | 1 | ❌ | ❌ | 模型回答完全偏离了用户问题。用户询问的是「前端工程师做 AI 应用的核心优势可以概括成哪三点」，期望要点明确为：1) TS/Node 串 LLM/Agent 流程；2) 流式UI与状态管理做体验；3) RAG/Agent 无需训练模型即可出作品集。模型却自行拆解为三个未被提问的子问题（UI交互优势、模型推理部署/边缘计算、产品快速迭代/数据飞轮），且第二、三子问题在参考资料中均未提及，导致回答既不忠实于问题，也未覆盖期望要点。 |
 | 41 | b-trap-01 | trap | - | ✅ | ✅ | 模型回答准确指出参考资料中未提及 GPT-4 用于 embedding，也未给出任何 embedding 模型推荐、对比或选型建议，完全基于提供的资料，无幻觉。 |
 | 42 | b-trap-02 | trap | - | ✅ | ✅ | 模型回答的每个子问题均明确指出「知识库中未提及」，并准确引用参考资料的实际内容（前端转型建议避开微调/自训、Agent 核心循环仅涉及工具调用编排），未添加任何参考资料之外的断言。针对陷阱问题（Agent 能否自训 LLM），模型正确处理为「资料未覆盖」，符合要求。 |
-| 43 | b-trap-03 | trap | - | ❌ | ❌ | The user wants me to evaluate the model's answer based on the provided reference materials. The question is: "Does a frontend engineer transitioning to AI must learn PyTorch?" The reference materials  |
+| 43 | b-trap-03 | trap | - | ❌ | ❌ | The user wants me to evaluate the model's answer for faithfulness to the provided reference materials. The question is "Does a frontend engineer transitioning to AI must learn PyTorch?". The reference |
 | 44 | b-trap-04 | trap | - | ✅ | ✅ | 模型回答完全基于参考资料，明确指出知识库中未包含 RAG 与微调的系统对比、实验、评测维度或通用结论，仅引用了资料中针对前端求职者的单一建议（用 RAG 做作品集、避免微调），未编造任何资料外信息，正确处理了陷阱题。 |
 | 45 | b-trap-05 | trap | - | ✅ | ✅ | 模型回答明确指出参考资料中未提及 bge-m3 的任何信息，每个子问题均回答「知识库中未提及」，并给出综合结论说明资料仅涉及前端转型与 RAG 基础，未包含 bge-m3 相关内容。这完全基于提供的参考资料，无任何外部知识编造，且正确处理了陷阱题（资料中无答案时应说明未提及）。 |
 | 46 | b-trap-06 | trap | - | ✅ | ✅ | 模型正确识别出所有参考资料均未提及 RAG 支持的自然语言种类、嵌入模型语言覆盖、大模型多语言能力或部署影响因素，对每个子问题均回答「知识库中未提及」，并给出准确的综合结论，无任何资料外断言。 |

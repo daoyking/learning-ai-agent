@@ -437,7 +437,7 @@
       "faithful": false,
       "correct": false,
       "answer": "**子问题列表：**\n1. 前端转型 AI 的核心技能栈包含哪些？\n2. PyTorch 在 AI 开发流程中扮演什么角色？\n3. 前端背景下有哪些替代 PyTorch 的工具或框架？\n4. 不学 PyTorch 能否胜任 AI 应用层/工程化岗位？\n\n---\n\n### 1. 前端转型 AI 的核心技能栈包含哪些？\n**回答：**  \n核心技能栈集中在 **应用层工程化能力**，而非模型训练。资料明确列出：  \n- **TS/JS + 异步编程（async/Promise）**：用于调用 LLM API、编排 Agent 流程，零门槛上手 [1]。  \n- **流式 UI 与打字机效果**：天然契合 LLM 逐 token 输出，提供实时交互体验 [1]。  \n- **组件化与状态管理**：可优雅封装「工具调用可视化」「中间步骤时间线」等 AI 交互组件 [1]。  \n- **Web API / JSON / fetch**：对接模型服务、第三方工具毫无障碍 [1]。  \n- **检索增强生成（RAG）**：求职期作品集只需掌",
-      "reason": "The user wants me to evaluate the model's answer based on the provided reference materials. The question is: \"Does a frontend engineer transitioning to AI must learn PyTorch?\" The reference materials "
+      "reason": "The user wants me to evaluate the model's answer for faithfulness to the provided reference materials. The question is \"Does a frontend engineer transitioning to AI must learn PyTorch?\". The reference"
     },
     "b-trap-04": {
       "id": "b-trap-04",
