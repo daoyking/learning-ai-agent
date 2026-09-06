@@ -1,0 +1,506 @@
+{
+  "order": [
+    "b-fact-01",
+    "b-fact-02",
+    "b-fact-03",
+    "b-fact-04",
+    "b-fact-05",
+    "b-fact-06",
+    "b-fact-07",
+    "b-fact-08",
+    "b-fact-09",
+    "b-fact-10",
+    "b-fact-11",
+    "b-fact-12",
+    "b-fact-13",
+    "b-fact-14",
+    "b-fact-15",
+    "b-fact-16",
+    "b-fact-17",
+    "b-fact-18",
+    "b-fact-19",
+    "b-fact-20",
+    "b-fact-21",
+    "b-fact-22",
+    "b-fact-23",
+    "b-fact-24",
+    "b-fact-25",
+    "b-fact-26",
+    "b-fact-27",
+    "b-fact-28",
+    "b-fact-29",
+    "b-fact-30",
+    "b-multi-01",
+    "b-multi-02",
+    "b-multi-03",
+    "b-multi-04",
+    "b-multi-05",
+    "b-multi-06",
+    "b-multi-07",
+    "b-multi-08",
+    "b-multi-09",
+    "b-multi-10",
+    "b-trap-01",
+    "b-trap-02",
+    "b-trap-03",
+    "b-trap-04",
+    "b-trap-05",
+    "b-trap-06",
+    "b-trap-07",
+    "b-trap-08",
+    "b-trap-09",
+    "b-trap-10"
+  ],
+  "rows": {
+    "b-fact-01": {
+      "id": "b-fact-01",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答 RAG 的英文全称需覆盖的子要点：**\n1. RAG 的英文全称\n2. RAG 的中文含义（如资料中有提及）\n\n---\n\n**逐条作答：**\n\n1. **RAG 的英文全称**  \n   Retrieval-Augmented Generation  \n   来源：[1] rag-explained.md、[2] rag-explained.md\n\n2. **RAG 的中文含义**  \n   检索增强生成  \n   来源：[1] rag-explained.md、[2] rag-explained.md",
+      "reason": "回答准确给出了 RAG 的英文全称 Retrieval-Augmented Generation 及其中文含义 检索增强生成，均直接来自参考资料 [1] 和 [2]，且未添加任何资料外内容。"
+    },
+    "b-fact-02": {
+      "id": "b-fact-02",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. RAG 让 LLM 在回答前的核心动作是什么\n2. 该动作的具体执行流程包含哪些步骤\n3. 为什么要在回答前执行这个动作\n\n---\n\n**逐条作答：**\n\n1. **核心动作：先「查资料」（检索相关知识片段）**  \n   RAG 让 LLM 在回答前先进行检索，从外部知识库中找出与用户问题最相关的文档片段，而不是直接依赖模型训练时记忆的参数化知识。  \n   来源：`rag-explained.md` 第 1 段「RAG（Retrieval-Augmented Generation，检索增强生成）让 LLM 在回答前先『查资料』……」\n\n2. **具体执行流程：索引 → 检索 → 生成**  \n   - **索引**：文档切分 → 向量化 → 存入向量库  \n   - **检索**：将用户问题向量化，用余弦相似度在向量库中找出最相关片段  \n   - **生成**：将检索到的片段作为上下文拼入提示词，让模型据此作答并注明来源  \n   来源：`rag-explained.md` 第 2 段「流程」1-3 点\n\n3. **原因：解决模型知识滞后、幻觉及私有数据不可用问题**  \n   通过先检索再生成，可基于私有/最新知识作答，避免仅靠训练时记忆导致的知识过时、幻觉或无法访问内部文档。  \n   来源：`rag-explained.md` 第 1 段「从而基于私有/最新知识作答，而不是只靠训练时记住的内容」",
+      "reason": "模型回答严格依据参考资料 `rag-explained.md` 作答，每条要点均标注来源且内容与原文一致。核心动作「先查资料（检索）」、三步流程「索引→检索→生成」、以及原因「基于私有/最新知识而非训练记忆」均完整覆盖了期望要点，无资料外断言。"
+    },
+    "b-fact-03": {
+      "id": "b-fact-03",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**子要点：**\n1. RAG 流程的第一阶段：索引\n2. RAG 流程的第二阶段：检索\n3. RAG 流程的第三阶段：生成\n\n---\n\n**逐条作答：**\n\n1. **索引**  \n   把文档切分 → 向量化 → 存入向量库。  \n   来源：[1] rag-explained.md\n\n2. **检索**  \n   把用户问题向量化，用余弦相似度找出最相关的片段。  \n   来源：[1] rag-explained.md\n\n3. **生成**  \n   把检索到的片段作为上下文拼进提示词，让模型据此作答并注明来源。  \n   来源：[1] rag-explained.md",
+      "reason": "回答完整列出了索引、检索、生成三个阶段，且每阶段的描述均直接引用自参考资料 [1]，没有引入资料外信息，完全覆盖了期望要点。"
+    },
+    "b-fact-04": {
+      "id": "b-fact-04",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. 文档切分  \n2. 向量化  \n3. 存入向量库  \n4. 为什么需要分块（分块的原因与建议大小）\n\n---\n\n### 1. 文档切分  \n索引阶段首先将原始文档切分成较小的文本块。  \n**来源**：[1] rag-explained.md 中「索引（Ingest）：把文档切分（chunk）……」\n\n### 2. 向量化  \n将切分后的文本块通过嵌入模型转换为向量表示。  \n**来源**：[1] rag-explained.md 中「索引（Ingest）：……向量化（embedding）……」\n\n### 3. 存入向量库  \n生成的向量被存入向量数据库，供后续检索使用。  \n**来源**：[1] rag-explained.md 中「索引（Ingest）：……存入向量库。」\n\n### 4. 为什么需要分块（分块的原因与建议大小）  \n文档过长会超出上下文窗口且引入噪声；合理分块能提升检索精度。常见块大小为 200–500 字。  \n**来源**：[1] rag-explained.md 中「## 为什么需要分块」段落。",
+      "reason": "模型回答完全基于参考资料[1]，准确覆盖了索引阶段的三个核心步骤（文档切分、向量化、存入向量库），并补充了参考资料中「为什么需要分块」段落的内容（分块原因及建议大小），所有断言均有来源标注，无资料外臆造。"
+    },
+    "b-fact-05": {
+      "id": "b-fact-05",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. 用户问题如何转化为可检索的表示（向量化）\n2. 使用何种相似度度量进行初步检索\n3. 是否有后续重排步骤进一步提升相关性\n\n---\n\n### 1. 用户问题向量化\n检索阶段首先将用户的问题通过嵌入模型转化为向量表示，以便与已存储的文档片段向量进行比对。  \n**来源**：[1] rag-explained.md 第 2 步「检索（Retrieve）：把用户问题向量化……」\n\n### 2. 余弦相似度进行初步检索\n将问题向量与向量库中所有片段向量计算**余弦相似度**，按相似度降序召回 top‑K 个最相关片段。  \n**来源**：[1] rag-explained.md 第 2 步「……用余弦相似度找出最相关的片段。」\n\n### 3. 可选的重排（Re-rank）步骤\n在获得 top‑K 候选片段后，可引入精排模型对候选片段重新打分排序，进一步提升最终上下文的相关性。  \n**来源**：[1] rag-explained.md「重排（Re-rank）」段落：「检索 topK 之后，可再用一个精排模型对候选片段重新排序，进一步提升相关性。」",
+      "reason": "回答完全基于参考资料：明确说明用户问题向量化、使用余弦相似度进行初步检索，并补充了参考资料中提到的可选重排步骤，覆盖了期望要点且无资料外断言。"
+    },
+    "b-fact-06": {
+      "id": "b-fact-06",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答所需覆盖的子要点：**\n1. Generate 阶段具体拼入提示词的内容是什么\n2. 这样拼接的目的是什么\n3. 对模型输出有何额外要求（如注明来源）\n\n---\n\n### 1. Generate 阶段拼入提示词的内容\n**回答：** 把**检索到的文档片段（chunk）作为上下文**拼进提示词。  \n**来源：** [1] rag-explained.md 第 3 步「生成（Generate）」\n\n### 2. 拼接上下文的目的\n**回答：** 让模型**据此作答**，即基于检索到的私有/最新知识回答，而不是仅靠训练时记忆的参数化知识。  \n**来源：** [1] rag-explained.md 第 3 步及开头段落\n\n### 3. 对模型输出的额外要求\n**回答：** 要求模型在作答时**注明来源**（引用所用片段）。  \n**来源：** [1] rag-explained.md 第 3 步「并注明来源」",
+      "reason": "模型回答完全基于参考资料[1]第3步内容，准确拆解了Generate阶段拼入内容（检索片段作上下文）、目的（据此作答而非靠参数记忆）及额外要求（注明来源），覆盖所有期望要点且无资料外断言。"
+    },
+    "b-fact-07": {
+      "id": "b-fact-07",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. 避免文档过长超出模型上下文窗口限制  \n2. 降低噪声、提升检索精度  \n3. 平衡分块粒度（过大导致召回泛、过小易断章取义）  \n4. 常见分块大小范围  \n\n---\n\n**逐条作答：**\n\n1. **避免文档过长超出模型上下文窗口限制**  \n   参考资料指出：“文档太长会超出上下文窗口”【1】。\n\n2. **降低噪声、提升检索精度**  \n   参考资料指出：合理分块能“提升检索精度”，并提到“噪声大”【1】。\n\n3. **平衡分块粒度（过大导致召回泛、过小易断章取义）**  \n   参考资料明确说明：“chunk 太大召回泛、太小容易断章取义”【1】。\n\n4. **常见分块大小范围**  \n   参考资料给出经验值：“常见 200–500 字”【1】。",
+      "reason": "模型回答完全基于参考资料，逐条引用了文档中关于分块必要性的所有关键点：上下文窗口限制、噪声与检索精度、粒度权衡（过大召回泛、过小断章取义）以及常见分块大小范围（200–500 字），无任何资料外断言，且覆盖了期望要点。"
+    },
+    "b-fact-08": {
+      "id": "b-fact-08",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答所需的子要点：**\n1. 文档分块的常见字数范围\n2. 分块字数过大或过小的影响（可选背景信息）\n\n---\n\n**基于参考资料的回答：**\n\n1. **常见字数范围**：文档分块常见的字数范围是 **200–500 字**【1】。  \n2. **范围选择的依据**：参考资料指出，chunk 太大容易导致召回泛化、太小容易断章取义，因此 200–500 字是一个折中的常用区间【1】。  \n\n> 来源：`rag-explained.md`（第「为什么需要分块」段落）",
+      "reason": "回答完全基于参考资料，准确给出常见 200–500 字的分块范围，并解释了过大/过小的影响，覆盖了期望要点。"
+    },
+    "b-fact-09": {
+      "id": "b-fact-09",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. 分块过大（chunk 太大）导致的问题\n2. 分块过小（chunk 太小）导致的问题\n3. 推荐的分块大小范围\n4. 为什么需要分块的根本原因\n\n---\n\n### 1. 分块过大（chunk 太大）导致的问题\n**回答：** 分块过大时，检索召回的片段会比较「泛」（宽泛/不精准），包含过多无关噪声，降低检索精度，且可能超出模型上下文窗口限制。  \n**来源：** `rag-explained.md` —— “chunk 太大召回泛”\n\n### 2. 分块过小（chunk 太小）导致的问题\n**回答：** 分块过小时，容易「断章取义」，上下文信息不完整，导致检索到的片段语义割裂，无法为生成提供足够支撑。  \n**来源：** `rag-explained.md` —— “太小容易断章取义”\n\n### 3. 推荐的分块大小范围\n**回答：** 常见建议为 **200–500 字**（中文字符数），以平衡召回精度与上下文完整性。  \n**来源：** `rag-explained.md` —— “常见 200–500 字”\n\n### 4. 为什么需要分块的根本原因\n**回答：** 原始文档过长会超出 LLM 的上下文窗口，且直接塞入全文会引入大量噪声；合理分块能提升检索精度，使检索到的片段更聚焦、更相关。  \n**来源：** `rag-explained.md` —— “文档太长会超出上下文窗口，且噪声大。合理分块能提升检索精度”",
+      "reason": "回答完全基于参考资料 rag-explained.md，逐条引用了原文中的“chunk 太大召回泛”“太小容易断章取义”“常见 200–500 字”以及分块的根本原因，无任何资料外断言；同时覆盖了期望要点中要求的“太大召回泛、太小容易断章取义”，并准确给出了推荐分块大小与分块必要性，内容准确完整。"
+    },
+    "b-fact-10": {
+      "id": "b-fact-10",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. 重排在 RAG 流程中的执行时机  \n2. 重排使用的模型/方法  \n3. 重排的目的/作用  \n\n---\n\n### 1. 重排在 RAG 流程中的执行时机  \n**回答：** 重排发生在「检索（Retrieve）阶段取得 topK 候选片段之后」，即先用向量检索召回一组候选，再对这组候选做二次排序。  \n**来源：** [1] rag-explained.md ——「检索 topK 之后，可再用一个精排模型对候选片段重新排序……」\n\n### 2. 重排使用的模型/方法  \n**回答：** 使用一个「精排模型」（re-ranker / cross-encoder 等）对候选片段进行重新打分排序。  \n**来源：** [1] rag-explained.md ——「可再用一个精排模型对候选片段重新排序」\n\n### 3. 重排的目的/作用  \n**回答：** 进一步提升召回片段与用户问题的相关性，筛选出更精准的上下文供下游生成使用。  \n**来源：** [1] rag-explained.md ——「进一步提升相关性」",
+      "reason": "模型回答完全基于参考资料[1]中的重排描述，准确覆盖了执行时机（检索topK之后）、使用模型/方法（精排模型/cross-encoder）及目的（提升相关性）三个子要点，无资料外断言。"
+    },
+    "b-fact-11": {
+      "id": "b-fact-11",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": false,
+      "correct": false,
+      "answer": "**回答「Agent 是什么」需覆盖的子要点：**\n\n1. Agent 的定义与核心概念  \n2. Agent 的核心能力/特征（如规划、工具调用、记忆等）  \n3. Agent 的典型工作流程/架构  \n4. 常见 Agent 类型或应用场景  \n\n---\n\n### 逐条作答\n\n1. **Agent 的定义与核心概念**  \n   知识库中未提及。\n\n2. **Agent 的核心能力/特征**  \n   知识库中未提及。参考资料 [1][2] 仅在「能力迁移」中提到「串 Agent 流程零门槛」及「同样一个 Agent，你能做出带流式打字、步骤可视化……的界面」，但未对 Agent 的能力做定义性描述。\n\n3. **Agent 的典型工作流程/架构**  \n   知识库中未提及。\n\n4. **常见 Agent 类型或应用场景**  \n   知识库中未提及。\n\n---\n\n**总结**：提供的参考资料（[1] 前端转 AI 应用开发、[3] RAG 介绍）均未对「Agent」给出定义、架构或分类等实质性解释，仅在前端转型语境下偶尔带过该词。",
+      "reason": "The user wants me to evaluate the model's answer based on the provided reference materials and expected points. The task is to output a JSON with \"faithful\", \"correct\", and \"reason\".\n\nFirst, let's ana"
+    },
+    "b-fact-12": {
+      "id": "b-fact-12",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": false,
+      "correct": false,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. Agent 的定义与核心特征\n2. 一次性问答的定义与核心特征\n3. 两者在交互模式、任务处理、状态管理等方面的具体区别\n4. 适用场景差异\n\n---\n\n**基于参考资料作答：**\n\n1. **Agent 的定义与核心特征**  \n   知识库中未提及。\n\n2. **一次性问答的定义与核心特征**  \n   知识库中未提及。\n\n3. **两者在交互模式、任务处理、状态管理等方面的具体区别**  \n   知识库中未提及。参考资料 [1][2] 仅提到前端工程师可用 TS/JS「串 Agent 流程」、做「工具调用可视化」「中间步骤时间线」，但未对比一次性问答。\n\n4. **适用场景差异**  \n   知识库中未提及。\n\n---\n\n**结论：** 提供的参考资料（frontend-to-ai.md）聚焦于前端工程师转型 AI 应用开发的路径、避坑指南及护城河构建，**未包含 Agent 与一次性问答的对比说明**。",
+      "reason": "{\"fa"
+    },
+    "b-fact-13": {
+      "id": "b-fact-13",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": false,
+      "answer": "**回答所需的子要点：**\n1. ReAct 循环的定义与背景\n2. ReAct 循环包含的四个具体步骤\n3. 每个步骤的作用说明\n4. 相关示例或应用场景\n\n**基于参考资料作答：**\n\n知识库中未提及 Agent 的 ReAct 循环及其四个步骤。提供的参考资料（frontend-to-ai.md）仅涉及前端工程师转型 AI 应用开发的能力迁移、避坑指南和护城河建设，未包含 ReAct 循环相关内容。",
+      "reason": "模型回答准确指出参考资料中不包含 ReAct 循环的内容，未引入外部知识，符合 faithful；但未提供期望的四个步骤，因此未覆盖期望要点，correct 为 false。"
+    },
+    "b-fact-14": {
+      "id": "b-fact-14",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答所需覆盖的子要点：**\n1. 模型在工具调用时返回的具体内容结构\n2. 返回内容的后续处理流程\n\n---\n\n**逐条作答：**\n\n1. **模型返回的内容结构**  \n   模型返回一个 **「函数名 + 参数」** 的结构化对象，指明要调用哪个工具以及传入什么参数。  \n   *来源：[1] agent-basics.md → 工具调用（Tool Calling）*\n\n2. **返回内容的后续处理**  \n   该返回值由本地代码执行对应的工具函数，执行得到的结果再被「回灌」给模型，作为下一轮推理的观察输入。  \n   *来源：[1] agent-basics.md → 工具调用（Tool Calling）*",
+      "reason": "模型回答完全基于参考资料[1]中的「工具调用（Tool Calling）」段落，准确提取了「函数名+参数」的返回结构及「本地代码执行→结果回灌模型」的后续流程，覆盖了期望要点且无资料外断言。"
+    },
+    "b-fact-15": {
+      "id": "b-fact-15",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. 模型在正确时机调用工具的决策\n2. Agent 核心循环（ReAct）中工具调用环节的成败\n3. 整体任务完成的准确性与效率\n\n---\n\n### 1. 模型在正确时机调用工具的决策\n**答案：** 描述写得好不好，**直接决定模型是否会在正确时机调用工具**。  \n**来源：** `agent-basics.md`（核心循环 → 工具调用段落）\n\n### 2. Agent 核心循环（ReAct）中工具调用环节的成败\n**答案：** 知识库中未提及。  \n**说明：** 参考资料虽描述了 ReAct 循环（Reason→Act→Observe），但未明确说明工具描述质量对循环整体成败的进一步影响。\n\n### 3. 整体任务完成的准确性与效率\n**答案：** 知识库中未提及。  \n**说明：** 资料未涉及工具描述质量对端到端任务准确率、效率或用户体验的量化影响。",
+      "reason": "回答准确引用参考资料[1]中的核心结论：工具描述质量直接决定模型是否在正确时机调用工具，覆盖了期望要点。对于未在资料中提及的ReAct循环成败及任务整体准确性/效率，回答明确标注\"知识库中未提及\"，未做资料外推断，符合忠实性要求。"
+    },
+    "b-fact-16": {
+      "id": "b-fact-16",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. 工具调用由谁执行\n2. 工具调用结果回灌给谁\n3. 回灌后进入什么循环\n\n---\n\n### 1. 工具调用由谁执行\n**回答：** 模型返回「函数名 + 参数」后，**由本地代码执行**工具调用。  \n**来源：** `agent-basics.md` —— “模型返回一个「函数名 + 参数」，由本地代码执行……”\n\n### 2. 工具调用结果回灌给谁\n**回答：** 执行得到结果后，**把结果回灌给模型**（即 LLM）。  \n**来源：** `agent-basics.md` —— “……再把结果回灌给模型。”\n\n### 3. 回灌后进入什么循环\n**回答：** 回灌后模型继续进行 **Reason（推理）**，形成 **Reason → Act → Observe → 再 Reason** 的 ReAct 核心循环，直到能给出最终回答。  \n**来源：** `agent-basics.md` —— “核心循环（ReAct）Reason（推理）→ Act（调用工具）→ Observe（观察结果）→ 再 Reason，直到能回答。”",
+      "reason": "回答完全基于参考资料 [1] agent-basics.md，准确指出工具调用由本地代码执行、结果回灌给模型、随后进入 ReAct 核心循环（Reason→Act→Observe→Reason），覆盖了期望要点“回灌给模型（作为下一步输入）”，且无资料外断言。"
+    },
+    "b-fact-17": {
+      "id": "b-fact-17",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. Agent 中 Memory 的核心定位/作用\n2. 短期记忆的实现方式（上下文窗口）\n3. 长期记忆的实现方式（外部存储）\n4. 记忆解决的核心问题（多轮对话连续性）\n\n---\n\n**基于参考资料的逐条作答：**\n\n1. **核心作用：支撑多轮对话的连续性**  \n   资料明确指出：*“多轮对话需要把历史消息保留在上下文窗口，或借助外部存储做长期记忆。”* 即 Memory 的首要作用是让 Agent 能在多轮交互中记住先前的对话历史，从而保持上下文连贯。  \n   **来源：** `agent-basics.md`\n\n2. **短期记忆：依赖上下文窗口保留历史消息**  \n   资料提到的第一种方式是 *“把历史消息保留在上下文窗口”*，这是 Agent 在单次会话/短期内维持记忆的主要手段，直接将过往对话作为后续推理的输入。  \n   **来源：** `agent-basics.md`\n\n3. **长期记忆：借助外部存储实现**  \n   资料指出的第二种方式是 *“借助外部存储做长期记忆”*，超越上下文窗口限制，将关键信息持久化，供后续会话甚至跨任务调用。  \n   **来源：** `agent-basics.md`\n\n4. **知识库中未提及**  \n   资料未进一步详述 Memory 的具体分类（如情景记忆、语义记忆、程序性记忆）、检索策略（如基于向量的相似度检索）、遗忘/压缩机制，或 Memory 与 Tool Calling、Planning 等其他模块的交互细节。",
+      "reason": "The answer faithfully summarizes the single sentence from agent-basics.md about Memory, covering both short-term (context window) and long-term (external storage) aspects, and correctly notes the absence of further details in the provided r"
+    },
+    "b-fact-18": {
+      "id": "b-fact-18",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": true,
+      "correct": false,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. 多轮对话中 Memory 的核心作用（如上下文保持、历史追踪）\n2. Memory 如何解决 LLM 无状态的局限性\n3. 常见 Memory 实现方式（如窗口记忆、摘要记忆、向量检索记忆）\n4. Memory 在 RAG/Agent 场景下的具体价值\n\n---\n\n**基于参考资料逐条作答：**\n\n1. **多轮对话中 Memory 的核心作用**  \n   知识库中未提及。参考资料 [1] 仅介绍 RAG 的索引、检索、生成流程及分块/重排策略，未涉及对话历史管理或 Memory 机制。\n\n2. **Memory 如何解决 LLM 无状态的局限性**  \n   知识库中未提及。资料 [1]-[3] 均聚焦于 RAG 架构与前端工程师转型 AI 应用开发，未讨论 LLM 无状态特性或 Memory 对此的补足。\n\n3. **常见 Memory 实现方式**  \n   知识库中未提及。文档中无窗口记忆、摘要记忆、向量检索记忆等技术细节的描述。\n\n4. **Memory 在 RAG/Agent 场景下的具体价值**  \n   知识库中未提及。虽然 [1] 说明 RAG 通过检索增强生成，但未结合多轮对话场景阐述 Memory 与检索的协同关系；[2][3] 仅论述前端技能迁移与避坑指南。",
+      "reason": "模型回答诚实地指出参考资料中完全缺失关于多轮对话 Memory 的内容，未产生任何资料外断言，符合 faithful 要求；但期望要点明确要求回答「需要把历史消息保留在上下文窗口」，模型未给出该核心解释，因此未覆盖期望要点，correct 为 false。"
+    },
+    "b-fact-19": {
+      "id": "b-fact-19",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答「Agent 的自主性体现在哪里」需覆盖的子要点：**\n\n1. 自主决定调用哪些工具来完成任务  \n2. 自主执行「推理 → 行动 → 观察」的循环（ReAct），直到能给出最终答案  \n3. 自主根据工具描述判断正确的调用时机  \n4. 自主管理多轮对话的上下文/记忆以支撑持续交互  \n\n---\n\n### 逐条作答\n\n1. **自主决定调用哪些工具来完成任务**  \n   资料明确指出：Agent 是「能自主决定调用哪些工具来完成任务的 LLM 应用」，区别于一次性问答。  \n   来源：`agent-basics.md`（核心定义段）\n\n2. **自主执行「推理 → 行动 → 观察」的循环（ReAct），直到能给出最终答案**  \n   资料描述核心循环为：Reason（推理）→ Act（调用工具）→ Observe（观察结果）→ 再 Reason，「直到能回答」。这体现了 Agent 自主控制流程、决定何时停止。  \n   来源：`agent-basics.md`（核心循环 ReAct 段）\n\n3. **自主根据工具描述判断正确的调用时机**  \n   资料说明：模型返回「函数名 + 参数」，「描述写得好不好，直接决定模型是否会在正确时机调用工具」，暗示 Agent 依据描述自主判断调用时机。  \n   来源：`agent-basics.md`（工具调用段）\n\n4. **自主管理多轮对话的上下文/记忆以支撑持续交互**  \n   资料提到：多轮对话需要「把历史消息保留在上下文窗口，或借助外部存储做长期记忆」，表明 Agent 需自主维护记忆以支持连续自主决策。  \n   来源：`agent-basics.md`（记忆段）",
+      "reason": "模型回答的四个子要点均直接来源于参考资料 agent-basics.md：第 1 点对应核心定义「自主决定调用哪些工具」，第 2 点对应 ReAct 核心循环描述，第 3 点对应工具调用段中「描述决定模型是否在正确时机调用工具」，第 4 点对应记忆段中「多轮对话需保留历史或外部存储」。回答未引入资料外断言，且完整覆盖了期望要点「自主决定调用哪些工具来完成任务」。"
+    },
+    "b-fact-20": {
+      "id": "b-fact-20",
+      "category": "fact",
+      "retrievalHit": 0,
+      "faithful": true,
+      "correct": false,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. ReAct 框架中 Observe（观察）步骤的定义与作用\n2. Observe 与 Thought、Action 的交互流程\n3. Observe 典型输出示例（如工具返回结果、环境反馈）\n\n---\n\n**基于参考资料作答：**\n\n知识库中未提及 ReAct 框架，也未提及 Observe（观察）步骤的定义、流程或示例。提供的三份资料分别介绍 RAG 流程（rag-explained.md）与前端工程师转型 AI 应用开发建议（frontend-to-ai.md），均不包含 ReAct 相关内容。",
+      "reason": "模型回答指出参考资料中未包含 ReAct 相关内容，这与提供的资料一致，故 faithful 为真。但期望要点为「观察工具执行的结果」，模型未给出该定义，未覆盖期望要点，故 correct 为假。"
+    },
+    "b-fact-21": {
+      "id": "b-fact-21",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题必须覆盖的 3 个子要点：**\n\n1. 核心技能无缝迁移（能力迁移）  \n2. 独特的护城河优势（产品交付差异化）  \n3. 避坑指南降低转型门槛（学习路径 ROI）\n\n---\n\n### 1. 核心技能无缝迁移（能力迁移）  \n前端工程师已掌握的 **TypeScript/JavaScript 与异步编程（async/Promise）**、**流式 UI 与打字机效果**、**组件化与状态管理**、**Web API/JSON/fetch** 等技能，可直接用于调用 LLM API、串联 Agent 流程、实现逐 token 流式渲染、封装工具调用可视化与中间步骤时间线、对接模型与第三方工具，**零门槛切入 AI 应用层开发**【frontend-to-ai.md】。\n\n### 2. 独特的护城河优势（产品交付差异化）  \n同一个 Agent，前端出身工程师能做出 **带流式打字、步骤可视化、错误重试优雅的界面**；这正是 **大多数算法背景同学最弱、而市场最缺的一环**，形成差异化竞争壁垒【frontend-to-ai.md】。\n\n### 3. 避坑指南降低转型门槛（学习路径 ROI）  \n资料明确建议：  \n- **不要一上来啃微积分/线性代数**（那是模型研究员路径，ROI 低易劝退）  \n- **先用熟悉的 TS/Node 调 LLM API 拿正反馈，再补 Python 与算法**  \n- **求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集**  \n这套“先做应用、后补理论、避重模型训练”的路径，显著降低转型风险与时间成本【frontend-to-ai.md】。",
+      "reason": "回答完全基于参考资料，逐条引用了「能力迁移」「护城河」「避坑指南」三大核心论据，且均标注来源，无任何资料外断言；同时覆盖了期望要点中「能力迁移被验证是优势赛道」的核心逻辑，并补充了护城河与低门槛路径，准确回答了用户问题。"
+    },
+    "b-fact-22": {
+      "id": "b-fact-22",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点（共 3 项）：**  \n1. TS/JS 与异步编程（async/Promise）能力  \n2. 流式 UI 与打字机效果实现能力  \n3. 组件化与状态管理能力  \n\n---\n\n### 1. TS/JS 与异步编程（async/Promise）能力  \n- **回答**：前端工程师熟练掌握 TypeScript/JavaScript 及其异步编程模型（async/await、Promise），可直接用于调用 LLM API、串联 Agent 流程，零门槛接入 AI 应用层。  \n- **来源**：[1] frontend-to-ai.md  \n\n### 2. 流式 UI 与打字机效果实现能力  \n- **回答**：前端擅长构建流式用户界面和打字机效果，这天然契合 LLM 逐 token 输出的特性，能提供平滑的实时交互体验。  \n- **来源**：[1] frontend-to-ai.md  \n\n### 3. 组件化与状态管理能力  \n- **回答**：前端的组件化开发模式与状态管理经验，可优雅封装「工具调用可视化」「中间步骤时间线」等 AI 应用特有的复杂 UI 逻辑。  \n- **来源**：[1] frontend-to-ai.md  \n\n> 备注：参考资料中还提到「Web API / JSON / fetch」作为可迁移能力，但题目仅要求列举至少两项，故以上三项已满足要求。",
+      "reason": "模型回答完全基于参考资料 [1] 中的「能力迁移」段落，准确列举了 TS/JS+异步、流式 UI 与打字机效果、组件化与状态管理三项可迁移能力，并备注了 Web API/JSON/fetch，满足「至少两项」的要求，无资料外断言。"
+    },
+    "b-fact-23": {
+      "id": "b-fact-23",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "**必须覆盖的子要点：**\n1. LLM 的核心输出特性是什么\n2. 流式 UI 如何与该特性配合\n3. 这种契合产生的典型交互效果\n\n---\n\n### 1. LLM 的核心输出特性：逐 token 输出\n**回答：** LLM 的输出是**逐 token（token-by-token）流式生成**的，而非一次性返回完整文本。  \n**来源：** `frontend-to-ai.md` —— “流式 UI 与打字机效果：天然契合 **LLM 的逐 token 输出**。”\n\n### 2. 流式 UI 与该特性的契合方式\n**回答：** 前端的流式渲染机制（如 SSE、WebSocket、fetch ReadableStream）可直接消费 LLM 逐 token 吐出的数据流，实时追加到界面，无需等待完整响应。  \n**来源：** `frontend-to-ai.md` —— “TS/JS + 异步（async/Promise）：调 LLM API、串 Agent 流程零门槛。” 结合上下文可知，前端原生异步流处理能力使其能无缝对接 LLM 的流式输出。\n\n### 3. 契合产生的典型交互效果：打字机效果\n**回答：** 这种契合天然形成**打字机效果**（typewriter effect）——字符逐个浮现，极大降低用户感知延迟，提升交互体验。  \n**来源：** `frontend-to-ai.md` —— “流式 UI 与打字机效果：天然契合 LLM 的逐 token 输出。” 及 “护城河” 段提到的“带流式打字……界面”。\n\n---\n\n**知识库中未提及：**  \n- 具体的流式协议细节（如 SSE 事件格式、chunk 解析逻辑）  \n- 非流式模式下的对比数据（首包延迟、完包延迟等量化指标）  \n- 多模态输出（图像、音频流）与流式 UI 的契合细节",
+      "reason": "The user wants me to evaluate the model's answer based on the provided reference materials and expected key points. I need to output a JSON with three fields: faithful (boolean), correct (boolean), an"
+    },
+    "b-fact-24": {
+      "id": "b-fact-24",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的 3 个子要点：**\n\n1. **前端转 AI 一上来不该啃的具体学科内容**  \n2. **为何不建议从这些内容入手**  \n3. **建议的正确切入路径及求职期应避免的方向**\n\n---\n\n### 1. 前端转 AI 一上来不该啃的具体学科内容  \n**回答：** 不要一上来啃 **微积分/线性代数**。  \n**来源：** [1] frontend-to-ai.md、[2] frontend-to-ai.md（两份资料内容一致，均在「该避的坑」首条明确列出）。\n\n### 2. 为何不建议从这些内容入手  \n**回答：** 微积分/线性代数属于 **模型研究员路径**，对于想做 AI 应用层（AI Application Engineer）的前端工程师而言，**ROI（投入产出比）低、易劝退**。  \n**来源：** [1] frontend-to-ai.md、[2] frontend-to-ai.md（同一段落给出理由）。\n\n### 3. 建议的正确切入路径及求职期应避免的方向  \n**回答：**  \n- **先用熟悉的 TS/Node 调用 LLM API 拿正反馈**，跑通「调模型 → 流式渲染 → 组件化封装」全链路，再按需补 Python 与算法基础。  \n- **求职期别碰模型微调/自训**；用 **检索增强生成（RAG）** 配合前端优势（流式打字、步骤可视化、错误重试等）即可做出有竞争力的作品集。  \n**来源：** [1] frontend-to-ai.md、[2] frontend-to-ai.md（「该避的坑」第 2、3 条及「护城河」段落）。",
+      "reason": "回答完全基于参考资料，准确提取了「不要一上来啃微积分/线性代数」及其原因（模型研究员路径、ROI 低、易劝退），并补充了资料中同段落给出的正向路径（先用 TS/Node 调 LLM API、再补 Python/算法）与求职期避坑（不碰微调/自训、用 RAG 做作品集），无任何资料外断言，覆盖了期望要点且内容准确。"
+    },
+    "b-fact-25": {
+      "id": "b-fact-25",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答所需覆盖的子要点：**\n1. 避免一上来学习微积分/线性代数等数学基础\n2. **先用熟悉的 TS/Node 调用 LLM API 来获取正反馈**\n3. 在获得正反馈后，再补充 Python 与算法知识\n4. 求职期避免涉足模型微调/自训，专注于检索（RAG）等应用层开发\n\n---\n\n**逐条作答：**\n\n1. **避免一上来学习微积分/线性代数等数学基础**  \n   文章明确指出：「不要一上来啃微积分/线性代数，那是模型研究员路径，ROI 低易劝退。」[1]\n\n2. **先用熟悉的 TS/Node 调用 LLM API 来获取正反馈**  \n   文章建议的核心行动是：「先用自己会的 TS/Node 调 LLM API 拿正反馈，再补 Python 与算法。」[1]\n\n3. **在获得正反馈后，再补充 Python 与算法知识**  \n   同一条建议的后半部分指出：正反馈建立后，「再补 Python 与算法」。[1]\n\n4. **求职期避免涉足模型微调/自训，专注于检索（RAG）等应用层开发**  \n   文章进一步建议：「求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集。」[1]",
+      "reason": "模型回答准确引用参考资料，明确指出文章建议“先用自己会的 TS/Node 调 LLM API 拿正反馈”，并覆盖了期望要点，无资料外断言。"
+    },
+    "b-fact-26": {
+      "id": "b-fact-26",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**子要点：**\n1. 求职期应避免接触的技术方向\n2. 推荐的替代技术路径\n\n---\n\n**逐条作答：**\n\n1. **求职期应避免接触的技术方向**  \n   文章明确建议：**求职期别碰模型微调/自训**（即不要在求职期间投入精力去做模型微调或从头训练模型）。  \n   来源：[1] frontend-to-ai.md、[2] frontend-to-ai.md（第「该避的坑」段落）\n\n2. **推荐的替代技术路径**  \n   文章指出：检索增强生成（RAG）已足够做出像样的作品集，建议先用熟悉的 TS/Node 调用 LLM API 获得正反馈，再补 Python 与算法。  \n   来源：[1] frontend-to-ai.md、[2] frontend-to-ai.md（第「该避的坑」段落）",
+      "reason": "模型回答准确引用参考资料中的核心建议——「求职期别碰模型微调/自训」，并补充了资料中同段落给出的替代路径（RAG 足够做作品集、先用 TS/Node 调 API 再补 Python），内容完全基于提供的文档，无外部臆断，且完整覆盖了期望要点。"
+    },
+    "b-fact-27": {
+      "id": "b-fact-27",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答所需覆盖的子要点：**\n1. 文章明确推荐的、足以支撑「像样作品集」的核心技术/方法\n2. 该技术在文中出现的上下文（针对谁、避开什么）\n3. 相关的实现路径提示（如结合前端已有技能）\n\n---\n\n### 1. 核心结论：RAG（检索增强生成）  \n**来源文件**：`frontend-to-ai.md`（第 2、3 份资料，内容相同）  \n原文：「求职期别碰模型微调/自训，**检索（RAG）足够做出像样的作品集**。」\n\n### 2. 适用人群与避坑指引  \n**来源文件**：`frontend-to-ai.md`  \n- 面向 **前端工程师转 AI 应用层（AI Application Engineer）** 的求职期。  \n- 明确建议 **不要** 一上来研究微积分/线性代数、模型微调或自训，这些是模型研究员路径、ROI 低且易劝退。\n\n### 3. 建议的实现路径（结合前端优势）  \n**来源文件**：`frontend-to-ai.md`  \n- 先用 **TS/Node 调用 LLM API** 拿正反馈，再补 Python 与算法。  \n- 利用前端擅长的 **流式 UI、打字机效果、组件化状态管理** 封装 RAG 应用的「工具调用可视化」「中间步骤时间线」，形成差异化护城河。\n\n---\n\n**知识库中未提及**：  \n- 具体的向量数据库选型（如 Pinecone、Milvus 等）  \n- Embedding 模型的具体选择（如 text-embedding-ada-002、BGE 等）  \n- RAG 之外的完整「技术栈」清单（如后端框架、部署方案、监控等）  \n\n> 总结：文章只点名 **RAG** 这一核心技术/方法足以支撑作品集，其余工程细节未在资料中展开。",
+      "reason": "回答准确引用参考资料 frontend-to-ai.md 中的原文「检索（RAG）足够做出像样的作品集」，并围绕该核心结论补充了适用人群（前端转 AI 应用）、避坑指引（别碰微调/自训/微积分）及结合前端优势的实现路径（TS/Node 调 API、流式 UI、组件化封装），均严格基于提供的资料，未引入任何外部知识。同时诚实列出资料中未提及的细节（向量库选型、Embedding 模型、完整技术栈清单），完全符合 faithful 与 correct 要求。"
+    },
+    "b-fact-28": {
+      "id": "b-fact-28",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的 3 个子要点：**\n\n1. **流式打字机效果的原生契合能力**  \n2. **工具调用与中间步骤的可视化封装能力**  \n3. **错误重试与异常状态的优雅交互处理能力**  \n4. **前端工程化技能（TS/JS、异步流控、组件化、Web API）对上述能力的支撑**\n\n---\n\n### 1. 流式打字机效果的原生契合能力  \n前端工程师擅长的**流式 UI 与打字机效果**天然契合 LLM 逐 token 输出的特性，能直接把模型的流式响应转化为用户可感知的“逐字显示”体验，这是算法背景开发者最薄弱、且市场极度稀缺的产品化环节【1†护城河】【1†能力迁移】。\n\n### 2. 工具调用与中间步骤的可视化封装能力  \n依托**组件化与状态管理**经验，前端能优雅封装「工具调用可视化」「中间步骤时间线」，把 Agent 的推理链路、工具调用参数/返回、中间思考步骤以结构化 UI 呈现，极大降低用户对黑盒模型的信任门槛【1†护城河】【1†能力迁移】。\n\n### 3. 错误重试与异常状态的优雅交互处理能力  \n前端成熟的**异步流控（async/Promise）、错误边界、重试策略、乐观 UI**等工程手段，可在 Agent 调用失败、超时、流式中断等异常场景下，提供自动重试、降级提示、进度恢复等完整交互闭环，保证产品级可用性【1†护城河】【1†能力迁移】。\n\n### 4. 前端工程化技能对上述能力的支撑  \n- **TS/JS + 异步编程**：调用 LLM API、串联 Agent 工作流零门槛【1†能力迁移】  \n- **Web API / JSON / fetch**：对接模型服务、第三方工具、RAG 检索接口毫无",
+      "reason": "The model answer accurately captures the three core moat points from the reference materials (streaming typing, step visualization, graceful error retry) and adds a fourth point about frontend engineering skills that is also supported by th"
+    },
+    "b-fact-29": {
+      "id": "b-fact-29",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答所需覆盖的子要点：**\n1. 组件化与状态管理能优雅封装「工具调用可视化」\n2. 组件化与状态管理能优雅封装「中间步骤时间线」\n3. 这一能力在前端工程师转型 AI 应用开发中属于哪类核心能力迁移\n\n---\n\n**逐条作答：**\n\n1. **组件化与状态管理能优雅封装「工具调用可视化」**  \n   根据参考资料，前端工程师的组件化与状态管理能力迁移到 AI 应用开发时，可优雅封装「工具调用可视化」——即将 Agent 调用外部工具（如搜索、代码执行、API 请求）的过程以可视化组件呈现。  \n   **来源文件**：`frontend-to-ai.md`\n\n2. **组件化与状态管理能优雅封装「中间步骤时间线」**  \n   同一资料指出，该能力还能优雅封装「中间步骤时间线」——将 Agent 执行过程中的推理步骤、工具调用链路、中间结果按时间顺序以组件化方式展示，便于用户理解与调试。  \n   **来源文件**：`frontend-to-ai.md`\n\n3. **这一能力属于前端工程师转型 AI 应用工程师的「能力迁移」核心项**  \n   资料将「组件化与状态管理：能优雅封装『工具调用可视化』『中间步骤时间线』」明确列为前端背景转 AI 应用层（AI Application Engineer）的四大核心能力迁移之一，与 TS/JS 异步编程、流式 UI、Web API 接入并列",
+      "reason": "模型回答完全基于参考资料，准确列出了组件化与状态管理能优雅封装的两个要点（工具调用可视化、中间步骤时间线），并正确指出这是前端工程师转型 AI 应用开发的核心能力迁移之一，无资料外断言，覆盖了所有期望要点。"
+    },
+    "b-fact-30": {
+      "id": "b-fact-30",
+      "category": "fact",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**子要点：**\n1. 算法背景同学最弱的具体能力表现\n2. 市场最缺的具体需求内容\n3. 该能力对 AI 应用开发的价值\n4. 前端背景同学在此方面的优势\n\n---\n\n**逐条作答：**\n\n1. **算法背景同学最弱的具体能力表现**  \n   资料指出：大多数算法背景同学最弱的是**做出带流式打字、步骤可视化、错误重试优雅的界面**这一环节。  \n   来源：`frontend-to-ai.md`（护城河段落）\n\n2. **市场最缺的具体需求内容**  \n   市场最缺的正是**能够构建具备流式打字效果、中间步骤可视化（如工具调用可视化、中间步骤时间线）、以及优雅错误重试机制的 AI 应用界面**的能力。  \n   来源：`frontend-to-ai.md`（护城河段落）\n\n3. **该能力对 AI 应用开发的价值**  \n   同样一个 Agent，若能呈现上述交互体验，将成为产品的核心护城河，显著提升用户体验与产品竞争力。  \n   来源：`frontend-to-ai.md`（护城河段落）\n\n4. **前端背景同学在此方面的优势**  \n   前端工程师凭借 **TS/JS 异步编程、流式 UI 与打字机效果实现、组件化与状态管理、Web API/JSON/fetch 对接** 等原有技能，天然契合 LLM 逐 token 输出与工具调用可视化需求，能零门槛落地这些界面能力。  \n   来源：`frontend-to-ai.md`（能力迁移段落）",
+      "reason": "回答完全基于参考资料，准确提取了「带流式打字、步骤可视化、错误重试优雅的界面能力」作为核心要点，并正确关联了算法背景弱项、市场稀缺点、产品价值及前端优势，所有论点均有文档出处支撑，无资料外断言。"
+    },
+    "b-multi-01": {
+      "id": "b-multi-01",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "**回答该问题需覆盖的 3 个子要点：**\n\n1. **TypeScript/JavaScript 与异步编程能力** —— 用于调用 LLM API、编排 RAG 检索与生成流程  \n2. **流式 UI 与打字机效果实现** —— 契合 LLM 逐 token 输出，提升回答呈现体验  \n3. **组件化与状态管理** —— 封装检索过程可视化、引用来源展示、中间步骤时间线等 RAG 特有交互  \n\n---\n\n### 逐条作答\n\n1. **TypeScript/JavaScript 与异步编程能力**  \n   前端工程师熟练掌握的 TS/JS 及 `async/await`、`Promise` 模式，可直接用于调用 LLM API、向量数据库检索接口，以及串联「检索 → 重排 → 生成」的 RAG 全链路流程，零门槛对接后端模型服务。  \n   **来源：** `frontend-to-ai.md` ——「TS/JS + 异步（async/Promise）：调 LLM API、串 Agent 流程零门槛」\n\n2. **流式 UI 与打字机效果实现**  \n   前端擅长的流式渲染、打字机动画天然契合 LLM 的逐 token 流式输出，能在 RAG 作品集中实现「边检索边生成、边生成边展示」的交互，显著提升用户感知速度与体验。  \n   **来源：** `frontend-to-ai.md` ——「流式 UI 与打字机效果：天然契合 LLM 的逐 token 输出」\n\n3. **组件化与状态管理**  \n   利用组件化思维与状态管理库（如 React/Vue 生态），可优雅封装 RAG 专属 UI：检索片段高亮、来源文档引用卡片、工具调用可视化、中间推理步骤时间线、错误重试与降级提示等，构建出「步骤可视化、错误重试优雅」的差异化作品集界面。  \n   **来源：** `frontend-to-ai.md` ——「组件化与状态管理：能优雅封装『工具调用可视化』『中间步骤时间线』」及「护城河」段落",
+      "reason": "{\"faithful\": true, \"correct\": false, \"reason\": \"回答完全基于参考资料，未出现资料外断言，故 faithful=true。但期望要点包含四点：①流式UI呈现检索结果、②组件化/状态管理封装步骤时间线、③Web API/fetch接模型、④RAG无需训练模型。回答覆盖了①②，"
+    },
+    "b-multi-02": {
+      "id": "b-multi-02",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "**回答该问题需要覆盖的子要点：**\n1. RAG 生成阶段的核心机制\n2. Agent ReAct 循环的核心机制\n3. 两者的共同思想/相似之处\n4. 基于参考资料的对比结论\n\n---\n\n### 1. RAG 生成阶段的核心机制\n**参考资料 [3] (rag-explained.md) 提及：**\n> “生成（Generate）：把检索到的片段作为上下文拼进提示词，让模型据此作答并注明来源。”\n\n**要点：** RAG 的生成阶段是将检索到的相关文档片段作为**外部上下文**注入提示词，让 LLM 基于这些**地面真实/私有/最新知识**生成回答，而非仅依赖模型内部参数记忆。\n\n---\n\n### 2. Agent ReAct 循环的核心机制\n**知识库中未提及。**  \n提供的三份资料（[1]、[2]、[3]）均未涉及 Agent、ReAct、Reasoning+Acting 循环、工具调用、思维链等概念。\n\n---\n\n### 3. 两者的共同思想/相似之处\n**知识库中未提及。**  \n由于资料缺少 ReAct 循环的描述，无法从参考资料中提炼共同思想（如“外部知识/工具增强推理”、“分步执行与环境交互”、“上下文注入与动作反馈闭环”等）。\n\n---\n\n### 4. 基于参考资料的对比结论\n- **RAG 生成阶段**：明确记载于 [3]，核心是**检索到的片段 → 上下文注入 → 基于上下文生成**。  \n- **Agent ReAct 循环**：**知识库中未提及**，无法作对比。  \n- **共同思想**：**知识库中未提及**，无法给出基于资料的答案。\n\n> **提示**：若需得到该对比，请补充包含 ReAct/Agent 循环说明的文档（如 ReAct 论文摘要、Agent 设计模式文档等），再进行检索问答。",
+      "reason": "The user wants me to evaluate the model's response based on the provided user question, expected points, and reference materials. I need to output a JSON with \"faithful\", \"correct\", and \"reason\".\n\nFir"
+    },
+    "b-multi-03": {
+      "id": "b-multi-03",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答大纲（子要点）：**\n1. 前端技能天然契合 LLM 的流式输出特性（流式 UI/打字机效果）。\n2. 组件化与状态管理能力可优雅封装 Agent 的工具调用可视化、中间步骤时间线等复杂交互。\n3. 算法/模型背景开发者普遍缺乏打磨流式交互、可视化与错误重试等产品级界面的能力，市场稀缺此类全栈型人才。\n\n---\n\n### 1. 前端技能天然契合 LLM 的流式输出特性  \n前端工程师熟悉 **流式 UI 与打字机效果** 的实现，这与 LLM **逐 token 流式输出** 的特性完美匹配，能零门槛实现“边生成边渲染”的交互体验【1】。\n\n### 2. 组件化与状态管理支撑 Agent 复杂交互可视化  \n前端擅长的 **组件化封装与状态管理**，可优雅实现「工具调用可视化」「中间步骤时间线」「错误重试」等 Agent 界面核心模块，降低复杂交互的开发维护成本【1】。\n\n### 3. 算法背景开发者在界面打磨上普遍薄弱，形成市场稀缺  \n同一个 Agent，**算法背景同学最弱、而市场最缺**的正是“带流式打字、步骤可视化、错误重试优雅”的产品级界面能力，前端转型者由此建立差异化护城河【1】。",
+      "reason": "模型回答完全基于参考资料[1]生成，未引入外部信息。回答准确覆盖了三个核心期望要点：1) 前端流式 UI/打字机效果天然契合 LLM 逐 token 输出；2) 组件化与状态管理可优雅封装工具调用可视化、步骤时间线等复杂交互；3) 算法背景开发者在产品级界面打磨（流式打字、步骤可视化、错误重试）上普遍薄弱，市场稀缺此类能力，从而形成前端转型者的护城河。"
+    },
+    "b-multi-04": {
+      "id": "b-multi-04",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "**回答需要覆盖的子要点：**\n1. 参考资料中是否提及 RAG 的具体步骤拆解\n2. 参考资料中是否说明哪一步不需要训练模型\n3. 参考资料中关于「求职期别碰微调、用 RAG 做作品集」的原文表述\n\n---\n\n**逐条作答：**\n\n1. **RAG 的具体步骤拆解**  \n   知识库中未提及。提供的三份资料（[1]、[2]、[3]）均未对 RAG 的内部流程（如索引构建、检索、生成等步骤）做任何拆解或说明。\n\n2. **哪一步不需要训练模型**  \n   知识库中未提及。资料仅指出「求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集」（见 [1] 和 [2] 的「该避的坑」段落），但未进一步说明 RAG 哪个具体环节免训练。\n\n3. **原文表述**  \n   两份相同的前端转 AI 文档均明确写到：  \n   > 「求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集。」  \n   来源：[1] frontend-to-ai.md、[2] frontend-to-ai.md，「该避的坑」第 3 条。",
+      "reason": "The user wants me to evaluate the model's answer based on the provided context (user question, expected points, reference materials, model answer). I need to output a JSON with \"faithful\", \"correct\", "
+    },
+    "b-multi-05": {
+      "id": "b-multi-05",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "**回答需覆盖的子要点：**\n1. Agent 工具调用中「本地代码执行」的机制说明\n2. 前端工程师在异步编程（async/Promise）方面的经验迁移\n3. 前端工程师在组件化与状态管理方面对工具调用可视化的优势\n4. 前端工程师对 JSON/Web API 的熟悉度与工具调用协议的契合\n\n---\n\n### 1. Agent 工具调用中的「本地代码执行」机制\n参考资料 [3] 明确指出：工具调用时，「模型返回一个『函数名 + 参数』，**由本地代码执行**，再把结果回灌给模型」。这是 Agent 核心循环（ReAct）中 Act 环节的落地方式。\n\n### 2. 前端工程师的异步编程经验（async/Promise）直接迁移\n参考资料 [1][2] 列出的首项能力迁移：**「TS/JS + 异步（async/Promise）：调 LLM API、串 Agent 流程零门槛」**。  \n本地代码执行工具本质是异步函数调用，前端工程师长期处理 Promise、async/await、事件循环，天然适配「发起调用 → 等待结果 → 回灌上下文」的异步流程。\n\n### 3. 组件化与状态管理可优雅封装「工具调用可视化 / 中间步骤时间线」\n参考资料 [1][2] 强调：**「组件化与状态管理：能优雅封装『工具调用可视化』『中间步骤时间线』」**。  \n本地代码执行的每一步（参数解析、执行、返回、错误重试）均可映射为前端组件状态，利用 React/Vue 等框架的响应式状态机实时渲染 Agent 执行轨迹，这是算法背景开发者普遍薄弱、但产品化极其需要的能力。\n\n### 4. 对 JSON / Web API / fetch 的熟悉度与工具调用协议无缝对接\n参考资料 [1][2] 提到：**「Web API / JSON / fetch：接模",
+      "reason": "{\"faithful\": true, \"correct\": true, \"reason\": \"模型回答完全基于提供的参考资料[1][2][3]，未引入外部知识。要点1引用[3]解释本地代码执行机制；要点2、3、4分别对应[1][2]中列出的三项能力迁移（异步编程、组件化状态管理、Web"
+    },
+    "b-multi-06": {
+      "id": "b-multi-06",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": false,
+      "answer": "**回答所需的子要点：**\n1. RAG 管线中「检索拿到片段」的具体步骤定义\n2. ReAct 循环的标准步骤拆解\n3. 两者的对应关系映射\n\n---\n\n### 1. RAG 管线中「检索拿到片段」的步骤  \n**参考资料 [3]（rag-explained.md）** 明确列出 RAG 三步流程：  \n- 索引 → **检索（Retrieve）：把用户问题向量化，用余弦相似度找出最相关的片段** → 生成  \n因此，「检索拿到片段」对应 RAG 的**第 2 步「检索（Retrieve）」**。\n\n### 2. ReAct 循环的标准步骤  \n**知识库中未提及** ReAct 循环的定义或步骤拆解（参考资料 [1]、[2]、[3] 均未涉及 ReAct）。\n\n### 3. 两者的对应关系映射  \n因知识库**未提供 ReAct 循环任何信息**，无法依据资料给出「检索拿到片段」对应 ReAct 哪一步的结论。**知识库中未提及**。",
+      "reason": "模型回答准确指出参考资料中未包含 ReAct 循环的任何信息，因此无法依据资料给出映射关系，未做任何资料外断言，符合 faithful 要求。但期望要点明确要求回答「对应 Observe（观察外部结果）」，模型未给出该对应关系，未覆盖期望要点，故 correct 为 false。"
+    },
+    "b-multi-07": {
+      "id": "b-multi-07",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. 前端流式 UI 的具体能力（打字机效果、步骤可视化、错误重试优雅处理）\n2. 这些能力如何契合 Agent 的核心循环与工具调用特性\n3. 对应护城河的具体定位（算法背景开发者最弱、市场最缺的一环）\n4. 组件化与状态管理在封装 Agent 中间过程中的作用\n\n---\n\n### 1. 前端流式 UI 的核心能力\n**回答：** 资料明确列出三项关键能力：**流式打字（打字机效果）**、**步骤可视化**（工具调用可视化、中间步骤时间线）、**错误重试的优雅界面**。  \n**来源：** [1]、[2]「能力迁移」与「护城河」段落。\n\n### 2. 如何提升 Agent 体验\n**回答：**  \n- **流式打字**天然契合 LLM 逐 token 输出，让用户实时看到生成过程，降低等待焦虑。  \n- **步骤可视化**通过组件化封装「工具调用可视化」「中间步骤时间线」，直观呈现 Agent 的 ReAct 循环——Reason→Act→Observe 的每一步，使「黑盒」过程透明可控。  \n- **错误重试优雅界面**在工具调用失败或模型幻觉时提供友好交互，保证多轮任务不中断。  \n**来源：** [1]、[2]「能力迁移」；[3]「核心循环（ReAct）」与「工具调用」。\n\n### 3. 对应护城河的哪一点\n**回答：** 资料直指：**「同样一个 Agent，你能做出带流式打字、步骤可视化、错误重试优雅的界面，这正是大多数算法背景同学最弱、而市场最缺的一环」**——即 **产品级交互体验（UI/UX）层的工程化落地能力** 是前端转 AI 应用开发的核心护城河。  \n**来源：** [1]、[2]「护城河」段落。\n\n",
+      "reason": "回答完全基于参考资料[1][2][3]，准确提炼了流式打字、步骤可视化、错误重试优雅界面三大能力，并结合 Agent ReAct 循环与工具调用特性解释了体验提升路径，最后精准对应护城河原文「带流式打字、步骤可视化、错误重试优雅的界面」且指出其为算法背景开发者最弱、市场最缺的产品级交互工程化能力，覆盖所有期望要点且无资料外断言。"
+    },
+    "b-multi-08": {
+      "id": "b-multi-08",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的 2-4 个子要点：**\n\n1. RAG 技术门槛低、无需模型训练，符合前端「先拿正反馈」的学习路径  \n2. 前端擅长的流式 UI、组件化可视化、Web API 对接，正好是 RAG 应用最缺的产品化能力  \n3. 资料明确指出「检索（RAG）足够做出像样的作品集」  \n4. 前端可把「查资料→生成」的中间过程（检索片段、重排、工具调用）做成可视化时间线，形成差异化护城河  \n\n---\n\n### 逐条作答\n\n1. **RAG 免去微调/自训，门槛低、见效快，契合前端「先用 TS/Node 调 LLM API 拿正反馈」的建议路径**  \n   资料明确建议：「求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集」[1][2]。RAG 只需调用现成 Embedding + LLM API，无需 GPU、无需微积分/线性代数，前端熟悉的 `fetch`/`async`/`Promise` 即可串起全流程。\n\n2. **前端核心技能（流式 UI、组件化、Web API/JSON）天然契合 RAG「查→生」的交互形态**  \n   - **流式打字机效果**：RAG 最后一步是 LLM 逐 token 生成，前端擅长的 `ReadableStream`/SSE 处理「天然契合 LLM 的逐 token 输出」[1][2]。  \n   - **组件化封装检索/重排/工具调用时间线**：资料指出前端能「优雅封装『工具调用可视化』『中间步骤时间线』」[1][2]，把 RAG 的「检索片段 → 重排 → 拼 Prompt → 生成」每一步都可视化，这是算法背景同学最弱、市场最缺的一环。  \n   - **Web API / JSON / fetch**：RAG 全链路（向量库查询、Embedding API、LLM API）均为 HTTP/JSON，前端「接模型、接第三方工具毫无障碍」[1][2]。\n\n3. **资料直接断言「RAG 足够做出像样的作品集」**  \n   文中原话：「求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集」[1][2]，说明 RAG 已被验证为前端求职作品集的充分技术栈。\n\n4. **前端可将 RAG 「查资料再答」的中间证据链产品化，形成差异化护城河**  \n   同一个 Agent，前端能做出「带流式打字、步骤可视化、错误重试",
+      "reason": "模型回答完全基于提供的参考资料（frontend-to-ai.md 与 rag-explained.md），未引入任何资料外断言；且逐条覆盖了期望要点：RAG 免训练、低门槛、前端可用 TS/Node 串起检索→生成流程、流式 UI 呈现、资料明确指出 RAG 足以做作品集、前端还能将中间过程可视化形成护城河。"
+    },
+    "b-multi-09": {
+      "id": "b-multi-09",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "The user is asking: \"Agent 需要 Memory 支撑多轮，前端工程师的什么能力正好适配这一点？\" (Agent needs Memory to support multi-turn conversations, what capability of frontend engineers fits this perfectly?)\n\nI need to look at the reference materials provided. There are three files, but [1] and [2] appear to be identical content (both are \"frontend-to-ai.md\"). [3] is \"rag-explained.md\" about RAG.\n\nThe question is about Agent Memory for multi-turn conversations and which frontend engineer capability matches this.\n\nLooking at the frontend-to-ai.md content, it lists capabilities:\n- TS/JS + 异步（async/Promise）：调 LLM API、串 Agent 流程零门槛。\n- 流式 UI 与打字机效果：天然契合 LLM 的逐 token 输出。\n- 组件化与状态管理：能优雅封装「工具调用可视化」「中间步骤时间线」。\n- Web API / JSON / fetch：接模型、接第三方工具毫无障碍.\n\nThe question is about \"Memory 支撑多轮\" (Memory supporting multi-turn). This likely relates to state management, conversation history, context management. The frontend capability that matches is \"组件化与状态管理\" (componentization and state management) because managing conversation history, memory, context across multiple turns is essentially state management. Also \"TS/JS + 异步\" could be relevant for handling async operations in multi-turn.\n\nBut the question specifically: \"Agent 需要 Memory 支撑多轮，前端工程师的什么能力正好适配这一点？\" The answer should be \"组件化与状态管理\" (componentization and state management) because memory in multi-turn conversations is about maintaining state across turns.\n\nLet me check if any other part mentions memory explicitly. The RAG file doesn't mention memory. The frontend file mentions \"状态管理\" (state management) which is exactly what memory is for multi-turn.\n\nThus the answer: 前端工程师的「组件化与状态管理」能力正好适配 Agent 多轮对话所需的 Memory 管理。\n\nI need to list 2-4 sub-points first, then answer each with sources.\n\nSub-points:\n1. 前端工程师擅长的状态管理能力可直接迁移到 Agent 多轮对话的 Memory 管理。\n2. 组件化思维有助于将对话历史、上下文封装为可复用的模块。\n3. 异步编程（async/Promise）能力支撑多轮交互中的非阻塞调用。\n4. 流式 UI 处理经验有助于实现逐 token 的实时响应展示。\n\nBut the question asks specifically \"什么能力正好适配这一点？\" (what capability fits this point?). So maybe just one main capability: 状态管理. However, the instruction says \"先列出回答此问题必须覆盖的 2-4 个子要点\" (list 2-4 sub-points that must be covered to answer this question). So I should break down the answer into sub-points.\n\nLet me formulate:\n\n子要点：\n1. 状态管理能力：前端工程师熟练掌握的状态管理（如 Redux、Vuex、React Context 等）可直接用于维护 Agent 多轮对话的上下文历史、用户偏好等 Memory 数据。\n2. 组件化封装：将 Memory 读写、上下文拼接、Token 窗口截断等逻辑封装为可复用组件/模块，符合前端组件化开发范式。\n3. 异步流程控制：TS/JS 的 async/await 与 Promise 链天然适配 Agent 多轮调用中的异步 API 请求、工具调用串联。\n4. 流式 UI 渲染：前端擅长的流式渲染与打字机效果，能将 LLM 逐 token 输出实时呈现，提升多轮交互体验。\n\nBut the question is specifically about Memory 支撑多轮. So the most direct is state management. The other points are also relevant but maybe not directly about Memory. However, the instruction says \"必须覆盖的 2-4 个子要点\" for answering the question. I'll include the most relevant.\n\nNow, I need to",
+      "reason": "The user is asking me to evaluate a model answer against the reference materials. The model answer provided is a detailed response about frontend engineer capabilities fitting Agent memory for multi-t"
+    },
+    "b-multi-10": {
+      "id": "b-multi-10",
+      "category": "multihop",
+      "retrievalHit": 1,
+      "faithful": false,
+      "correct": false,
+      "answer": "**必须覆盖的 3 个子要点：**\n1. 技术栈天然契合：TypeScript/JavaScript 异步编程与 Web API 生态对接 LLM/API 零门槛  \n2. 流式交互与 UI 工程化优势：组件化、状态管理天然适配流式输出、工具调用可视化等 AI 原生交互  \n3. 产品级交付的差异化护城河：能快速产出带流式打字、步骤可视化、错误重试优雅的完整界面，补足算法背景开发者工程化短板  \n\n---\n\n### 1. 技术栈天然契合：TS/JS 异步生态直通 LLM 与 Agent 编排  \n前端工程师熟练掌握的 **TypeScript/JavaScript、async/Promise、fetch/JSON、Web API** 等技能，可直接用于调用 LLM API、串联 Agent 多步流程、对接第三方工具，**“零门",
+      "reason": "The user wants me to evaluate a model answer against a user question, expected key points, and reference documents. I need to output a JSON with three fields: faithful (boolean), correct (boolean), an"
+    },
+    "b-trap-01": {
+      "id": "b-trap-01",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**子要点：**\n1. 知识库中是否提及 RAG 与 embedding 的关系\n2. 知识库中是否推荐使用 GPT-4 做 embedding\n3. 知识库中关于 RAG 的具体表述内容\n\n**逐条作答：**\n\n1. **知识库中是否提及 RAG 与 embedding 的关系**  \n   知识库中未提及 RAG 与 embedding 的具体技术关系，也未讨论 embedding 模型的选择。\n\n2. **知识库中是否推荐使用 GPT-4 做 embedding**  \n   知识库中未提及 GPT-4，更未建议用 GPT-4 做 embedding。\n\n3. **知识库中关于 RAG 的具体表述内容**  \n   文件 `frontend-to-ai.md` 的「该避的坑」部分仅提到：  \n   > 「求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集。」  \n   仅将 RAG 作为前端工程师转型 AI 应用层时可优先掌握的检索技术，未涉及任何 embedding 模型选型建议。\n\n**结论：** 知识库中未提及「RAG 应该用 GPT-4 来做 embedding」这一说法。",
+      "reason": "模型回答完全基于参考资料，准确指出知识库中仅在「该避的坑」一节提到 RAG 作为检索技术可用于作品集，未涉及 embedding 模型选型、未提及 GPT-4，也未建议用 GPT-4 做 embedding。回答无任何资料外断言，正确处理了陷阱题。"
+    },
+    "b-trap-02": {
+      "id": "b-trap-02",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的子要点：**\n\n1. 参考资料中关于「模型训练/微调」的定位与建议  \n2. 参考资料中对「Agent / AI 应用层」工作内容的描述  \n3. 资料是否提及 Agent 自主训练大模型的能力  \n4. 资料中区分的「模型研究员路径」与「AI 应用工程师路径」的差异  \n\n---\n\n### 1. 参考资料中关于「模型训练/微调」的定位与建议  \n**答：** 资料明确列在「该避的坑」中：  \n> 「求职期别碰模型微调/自训，检索（RAG）足够做出像样的作品集。」  \n并指出「不要一上来啃微积分/线性代数，那是模型研究员路径，ROI 低易劝退。」  \n**来源：** [1] frontend-to-ai.md、[2] frontend-to-ai.md  \n\n### 2. 参考资料中对「Agent / AI 应用层」工作内容的描述  \n**答：** 资料将前端工程师转型定位为 **AI Application Engineer**，核心任务是：  \n- 用 TS/JS 调用 LLM API、串联 Agent 流程  \n- 做流式 UI、工具调用可视化、中间步骤时间线、错误重试等工程化界面  \n- 以 **RAG（检索增强）** 为主构建作品集  \n**来源：** [1] frontend-to-ai.md、[2] frontend-to-ai.md  \n\n### 3. 资料是否提及 Agent 自主训练大模型的能力  \n**答：** **知识库中未提及** Agent 能否自主训练大语言模型。资料仅讨论人类工程师（前端转 AI 应用层）是否应涉足模型训练，未涉及 Agent 自身具备训练模型的能力。  \n\n### 4. 资料中区分的「模型研究员路径」与「AI",
+      "reason": "模型回答完全基于参考资料，未引入任何外部知识。针对陷阱问题「Agent 能自己训练大语言模型吗」，参考资料仅讨论人类前端工程师求职期是否应碰模型微调/自训，未涉及 Agent 自身具备训练模型的能力。模型在要点 3 明确指出「知识库中未提及 Agent 能否自主训练大语言模型」，正确处理了陷阱题，避免了幻觉。"
+    },
+    "b-trap-03": {
+      "id": "b-trap-03",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答子要点：**\n1. 前端转 AI 的推荐定位是「AI 应用工程师」，而非模型研究员\n2. 核心优势在于 TS/JS 技术栈直接调用 LLM API、构建流式 UI 与 Agent 交互界面\n3. 入门阶段应避开模型训练/微调（涉及 PyTorch 等框架），优先用 RAG 与工具调用做作品集\n4. Python 与算法可在拿到正反馈后再补，非硬性前置门槛\n\n---\n\n**逐条作答：**\n\n1. **定位差异：应用层 ≠ 研究层**  \n   资料明确指出「前端背景转 AI 应用层（AI Application Engineer）是一条被验证的优势赛道」，并强调「不要一上来啃微积分/线性代数，那是模型研究员路径，ROI 低易劝退」[1][2]。PyTorch 属于模型训练/研究工具链，非应用层必备。\n\n2. **前端技术栈可直接落地 AI 应用**  \n   - TS/JS + async/Promise：调 LLM API、串 Agent 流程「零门槛」  \n   - 流式 UI 与打字机效果：天然契合 LLM 逐 token 输出  \n   - 组件化与状态管理：可封装工具调用可视化、中间步骤时间线  \n   - Web API / JSON / fetch：接模型、接第三方工具「毫无障碍」[1][2]  \n   这些能力覆盖了 Agent 核心循环中「Act（调用工具）→ Observe（观察结果）」的前端落地[3]。\n\n3. **求职期无需",
+      "reason": "模型回答完全基于参考资料，准确指出前端转 AI 推荐定位为 AI 应用工程师，核心优势在于 TS/JS 技术栈可直接调用 LLM API、构建流式 UI 与 Agent 交互界面，入门阶段应避开模型训练/微调（涉及 PyTorch 等框架），优先用 RAG 与工具调用做作品集，Python 与算法可在拿到正反馈后再补，非硬性前置门槛。回答未引入参考资料之外的信息，正确处理了陷阱题（明确说明 PyTorch 非应用层必备）。"
+    },
+    "b-trap-04": {
+      "id": "b-trap-04",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. 知识库是否直接对比 RAG 与微调的优劣\n2. 知识库对 RAG 的定位或建议\n3. 知识库对微调的定位或建议\n4. 知识库给出的适用场景或受众差异\n\n---\n\n### 1. 知识库是否直接对比 RAG 与微调的优劣  \n**知识库中未提及** 直接的“RAG 与微调哪个效果更好”的横向对比结论。\n\n### 2. 知识库对 RAG 的定位或建议  \n文件 `frontend-to-ai.md` 指出：  \n> “求职期别碰模型微调/自训，**检索（RAG）足够做出像样的作品集**。”  \n—— 建议前端转 AI 应用开发者在求职阶段优先用 RAG 快速产出可演示的项目。\n\n### 3. 知识库对微调的定位或建议  \n同一文件明确劝阻：  \n> “求职期**别碰模型微调/自训**”  \n—— 认为微调/自训属于模型研究员路径，ROI 低、易劝退，不适合应用层工程师的入门与求职作品集准备。\n\n### 4. 知识库给出的适用场景或受众差异  \n- **RAG**：面向 **AI 应用工程师（前端转型者）**，用于快速落地、做作品集、求职。  \n- **微调/自训**：归类为 **模型研究员路径**，非应用层工程师的核心必修项。  \n\n**综上**：知识库未给出通用的“RAG 优于微调”或“微调优于 RAG”的绝对结论，仅针对 **前端工程师转型 AI 应用开发、准备求职作品集** 这一特定场景，建议**优先用 RAG、暂不碰微调**。",
+      "reason": "模型回答准确指出参考资料未直接对比 RAG 与微调的通用优劣，仅针对前端工程师转型求职场景建议优先用 RAG、暂不碰微调，且未引入任何参考资料之外的信息。"
+    },
+    "b-trap-05": {
+      "id": "b-trap-05",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "回答该问题需覆盖的子要点：\n1. bge-m3 的模型定位与类型\n2. bge-m3 的核心能力或特点\n3. bge-m3 的典型应用场景\n4. bge-m3 与其他模型的对比或版本信息\n\n---\n\n1. **bge-m3 的模型定位与类型**  \n   知识库中未提及。\n\n2. **bge-m3 的核心能力或特点**  \n   知识库中未提及。\n\n3. **bge-m3 的典型应用场景**  \n   知识库中未提及。\n\n4. **bge-m3 与其他模型的对比或版本信息**  \n   知识库中未提及。\n\n---\n\n**说明**：提供的三份参考资料（`frontend-to-ai.md`、`rag-explained.md`、`agent-basics.md`）均未涉及 bge-m3 模型的任何信息，因此无法基于知识库作答。",
+      "reason": "模型回答明确指出三份参考资料均未涉及 bge-m3，所有子要点均标注为「知识库中未提及」，未编造任何资料外信息，正确处理了陷阱题。"
+    },
+    "b-trap-06": {
+      "id": "b-trap-06",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. RAG 技术本身对自然语言支持的通用说明\n2. 具体支持的自然语言种类数量\n3. 影响语言支持的关键因素（如嵌入模型、LLM 能力）\n4. 参考资料中是否提及语言支持相关信息\n\n---\n\n**逐条作答：**\n\n1. **RAG 技术本身对自然语言支持的通用说明**  \n   知识库中未提及。\n\n2. **具体支持的自然语言种类数量**  \n   知识库中未提及。\n\n3. **影响语言支持的关键因素（如嵌入模型、LLM 能力）**  \n   知识库中未提及。\n\n4. **参考资料中是否提及语言支持相关信息**  \n   知识库中未提及。提供的三份资料（[1][2][3]）均聚焦于前端转 AI 应用开发路径及 RAG 基础流程（索引、检索、生成、分块、重排），未涉及 RAG 支持的自然语言种类或数量。",
+      "reason": "模型回答完全基于参考资料，明确指出三份资料均未涉及 RAG 支持的自然语言种类或数量，未编造任何资料外信息；针对陷阱题正确处理为「知识库中未提及」，符合要求。"
+    },
+    "b-trap-07": {
+      "id": "b-trap-07",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. 知识库是否推荐了具体的向量数据库产品名称\n2. 知识库中关于向量数据库的通用表述\n3. 是否提及了具体产品（如 Pinecone、Milvus、Chroma、Weaviate、Qdrant 等）\n\n---\n\n**基于参考资料作答：**\n\n1. **知识库中未提及任何具体的向量数据库产品名称**。  \n   —— 来源：`rag-explained.md` 第 1 步“索引”仅笼统写「存入向量库」，未给出产品名；`agent-basics.md` 与 `frontend-to-ai.md` 亦无相关内容。\n\n2. **知识库仅对向量数据库做通用描述**，指出 RAG 流程中需将文档切分、向量化后“存入向量库”，并用余弦相似度检索，但未对选型、优劣对比或具体部署建议作任何说明。  \n   —— 来源：`rag-explained.md` “流程”第 1、2 步。\n\n3. **知识库中未提及 Pinecone、Milvus、Chroma、Weaviate、Qdrant、pgvector 等任何具体产品或云服务**。  \n   —— 来源：全量参考资料检索结果均为空。",
+      "reason": "模型回答完全基于参考资料，准确指出三份文档均未提及任何具体向量数据库产品名称（如 Pinecone、Milvus、Chroma 等），仅在 rag-explained.md 中笼统提到「存入向量库」。模型正确处理了陷阱题，明确声明知识库中未提及，未产生任何资料外断言。"
+    },
+    "b-trap-08": {
+      "id": "b-trap-08",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**必须覆盖的子要点：**\n1. Agent 系统提示词的核心作用与定位\n2. 结合 ReAct 循环所需的关键指令内容\n3. 工具调用相关的约束与格式要求\n4. 记忆/上下文管理的相关指引\n\n---\n\n### 1. Agent 系统提示词的核心作用与定位\n**知识库中未提及** —— 参考资料 [1]-[3] 均未对“系统提示词应写什么内容”做直接说明。\n\n### 2. 结合 ReAct 循环所需的关键指令内容\n**参考资料 [2] agent-basics.md** 指出 Agent 运行的核心循环为 **Reason → Act → Observe → 再 Reason**。  \n据此可推断：系统提示词至少应明确要求模型在每一轮先输出**推理过程**，再决定是否**调用工具**，并在拿到工具返回后继续推理，直到得出最终答案。但文件未给出具体措辞示例。\n\n### 3. 工具调用相关的约束与格式要求\n**参考资料 [2] agent-basics.md** 强调：  \n- “模型返回一个『函数名 + 参数』，由本地代码执行，再把结果回灌给模型”  \n- “描述（description）写得好不好，直接决定模型是否会在正确时机调用工具”  \n\n因此，系统提示词需包含：  \n- **工具调用的输出格式规范**（如 JSON Schema）  \n- **可用工具列表及其 description**（由开发者在提示词或函数定义中提供）  \n- **何时必须/禁止调用工具的规则**  \n但文件未给出完整的提示词模板。\n\n### 4. 记忆/上下文管理的相关指引\n**参考资料 [2] agent-basics.md** 提到：  \n“多轮对话需要把历史消息保留在上下文窗口，或借助外部存储做长期记忆。”  \n这意味着系统提示词可考虑加入：  \n- **历史消息截断/摘要策略**  \n- **长期记忆读取/写入的触发条件**  \n但同样未在资料中给出具体写法。\n\n---\n\n**总结**：现有知识库覆盖了 Agent 的 **ReAct 循环、工具调用机制、记忆需求**，但**未直接提供系统提示词的完整内容或模板**。如需落地，建议参考业界通用模板（如 LangChain、AutoGPT、OpenAI Assistants 的系统提示词结构），并在上述四个方向上根据业务细化。",
+      "reason": "模型回答明确指出参考资料未直接提供 Agent 系统提示词的完整内容或模板，并仅基于资料 [2] 中的 ReAct 循环、工具调用机制、记忆管理等概念进行合理推断，未编造资料外的具体提示词措辞或模板，正确处理了陷阱题。"
+    },
+    "b-trap-09": {
+      "id": "b-trap-09",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": false,
+      "correct": false,
+      "answer": "",
+      "reason": "The user is asking about the average salary for frontend engineers transitioning to AI. I need to check if the provided reference materials contain any salary information.\n\nLooking at the reference ma"
+    },
+    "b-trap-10": {
+      "id": "b-trap-10",
+      "category": "trap",
+      "retrievalHit": null,
+      "faithful": true,
+      "correct": true,
+      "answer": "**回答该问题需覆盖的子要点：**\n1. RAG 生产环境部署架构（容器化、编排、服务拆分等）\n2. 向量数据库的生产化运维（高可用、备份、扩缩容）\n3. 监控、日志、追踪与告警体系\n4. CI/CD 流水线与版本管理（索引重建、模型热更新）\n5. 安全与合规（数据脱敏、访问控制、审计）\n\n---\n\n**基于参考资料逐条作答：**\n\n1. **RAG 生产环境部署架构**  \n   知识库中未提及。\n\n2. **向量数据库的生产化运维**  \n   知识库中未提及。\n\n3. **监控、日志、追踪与告警体系**  \n   知识库中未提及。\n\n4. **CI/CD 流水线与版本管理**  \n   知识库中未提及。\n\n5. **安全与合规**  \n   知识库中未提及。\n\n---\n\n**总结：**  \n当前知识库（`frontend-to-ai.md`、`rag-explained.md`）仅涵盖 **RAG 基本原理、分块/重排策略**，以及 **前端工程师转型建议（把 RAG 做进作品集即可）**，**完全没有涉及生产环境部署、运维、监控、CI/CD 或安全合规等工程化落地内容**。",
+      "reason": "模型回答准确指出参考资料中未涉及 RAG 生产环境部署、向量数据库运维、监控、CI/CD、安全合规等内容，且未编造任何资料外信息，正确处理了陷阱题。"
+    }
+  }
+}
