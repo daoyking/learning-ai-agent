@@ -16,6 +16,12 @@ detect:
   process: 'AnythingLLM'
   launchd: ['com.anythingllm.web-proxy']
   paths: ['/Applications/AnythingLLM.app']
+  # 【2026-09-06 实测】process 这条终于接线了，此前是死配置 ——
+  # build_card 只看「端口有没有人在听」，从不校验占用者是谁，
+  # 于是 8888 被 Unsloth Studio（python3.13）占着时，LSH 把没启动的
+  # AnythingLLM 标成「运行中」。这是本项目要消灭的假活本身。
+  # 已改为：占用者不匹配 detect.process → 记 conflict、状态不算 running。
+  # 7 个服务的正则都用真实命令行校验过，只有这个不匹配。
 
 supervisor:
   kind: app

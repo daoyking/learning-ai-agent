@@ -361,9 +361,33 @@ fn build_card(m: &ServiceManifest, ports: &[PortEntry]) -> ServiceCard {
 
     for candidate in &m.detect.ports {
         if let Some(entry) = ports.iter().find(|p| p.port == *candidate) {
-            listening_port = Some(entry.port);
-            pid = Some(entry.pid);
-            process = Some(entry.command.clone());
+            // 端口在听，还得确认是**我们**的进程在听。
+            //
+            // 只看端口会把别人的服务认成自己人：2026-09-06 实测 8888 被
+            // Unsloth Studio（python3.13）占着，LSH 却把 AnythingLLM 标成
+            // 「运行中」—— 应用根本没启动。manifest 里的 detect.process
+            // 就是为了防这个，但此前代码从没读过它（死配置）。
+            let mine = match &m.detect.process {
+                Some(pattern) => scanner::process_matches(entry, pattern),
+                None => true,
+            };
+            if mine {
+                listening_port = Some(entry.port);
+                pid = Some(entry.pid);
+                process = Some(entry.command.clone());
+            } else {
+                // 冒名占用：算冲突，不算运行中。展示完整命令行，方便一眼认出是谁
+                let full = scanner::full_command_of(entry.pid);
+                port_conflict = Some(PortConflict {
+                    port: entry.port,
+                    command: if full.is_empty() {
+                        entry.command.clone()
+                    } else {
+                        full.chars().take(120).collect()
+                    },
+                    pid: entry.pid,
+                });
+            }
             break;
         }
     }

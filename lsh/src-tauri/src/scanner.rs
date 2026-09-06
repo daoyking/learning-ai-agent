@@ -83,6 +83,49 @@ pub fn who_owns(port: u16) -> Option<PortEntry> {
         .find(|e| e.port == port)
 }
 
+/// 查某个 pid 的完整命令行（含参数）。
+///
+/// `lsof -F c` 只给进程名（`python3.13`、`node`），但 manifest 里的
+/// `detect.process` 是照着**完整命令行**写的（`uvicorn app:app`、
+/// `node.*omniroute`、`chroma-venv`），光看进程名根本匹配不上。
+///
+/// 拿不到就返回空串 —— 由调用方兜底，不能把「看不清」当成「不匹配」。
+pub fn full_command_of(pid: i32) -> String {
+    let out = Command::new("ps")
+        .args(["-ww", "-o", "command=", "-p", &pid.to_string()])
+        .output();
+    match out {
+        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        Err(_) => String::new(),
+    }
+}
+
+/// 端口占用者身份判定的**纯逻辑部分**，便于单测（不碰 ps）。
+///
+/// `pattern` 是正则；`command` 是 lsof 给进程名，`full_command` 是含参数的
+/// 完整命令行。两者任一匹配即算通过。
+///
+/// 降级策略：**判不了就放行**。完整命令行拿不到（ps 受限/进程已退出）时返回
+/// true。误把在跑的服务判成「端口被别人占了」，比漏判一次冒名更糟 ——
+/// 前者会让用户去查一个根本不存在的问题。
+pub fn command_matches(pattern: &str, command: &str, full_command: &str) -> bool {
+    let Ok(re) = regex::Regex::new(pattern) else {
+        return true; // 正则本身写错：不因此把服务判死
+    };
+    if re.is_match(command) {
+        return true;
+    }
+    if full_command.is_empty() {
+        return true;
+    }
+    re.is_match(full_command)
+}
+
+/// 端口的占用者是不是我们要的那个服务（读 manifest 的 detect.process）。
+pub fn process_matches(entry: &PortEntry, pattern: &str) -> bool {
+    command_matches(pattern, &entry.command, &full_command_of(entry.pid))
+}
+
 /// 服务是否处于「被监管」状态。
 ///
 /// 这是端口状态之外的一个独立维度：
@@ -189,5 +232,70 @@ mod tests {
         assert!(out[0].loopback_only);
         assert_eq!(out[1].port, 11434);
         assert!(!out[1].loopback_only);
+    }
+
+    /// 本机 2026-09-06 实测的**真实命令行**（psutil 采集，ps 在受管 shell 里被禁）。
+    ///
+    /// 这组夹具回答一个关键问题：manifest 里那些 detect.process 正则，
+    /// 到底有没有覆盖各自服务的真实命令行？如果没覆盖，严格判定会把
+    /// 明明在跑的服务误判成「端口被别人占了」—— 那比漏判更糟。
+    #[test]
+    fn detect_process_patterns_cover_real_command_lines() {
+        let cases: &[(&str, &str, &str, bool)] = &[
+            // (manifest 正则, lsof 进程名, 完整命令行, 期望是否匹配)
+            (
+                "AnythingLLM",
+                "python3.13",
+                "/Users/jindy/.unsloth/studio/unsloth_studio/bin/python /Users/jindy/.unsloth/studio/unsloth_studio/bin/unsloth studio --api-only -H 127.0.0.1",
+                false, // ← Unsloth Studio 占着 8888，不是 AnythingLLM
+            ),
+            (
+                "chroma run|chroma-venv",
+                "python3.13",
+                "/Users/jindy/Downloads/about-jindy/odysseus/chroma-venv/bin/python3 /Users/jindy/Downloads/about-jindy/odysseus/chroma-venv/bin/chroma run --host 127.0.0.1",
+                true,
+            ),
+            (
+                "uvicorn app:app|agent_loop",
+                "python3.13",
+                "/Users/jindy/Downloads/about-jindy/odysseus/venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 7001",
+                true,
+            ),
+            (
+                "dsh( |$)",
+                "node",
+                "node /Users/jindy/.local/bin/dsh web",
+                true,
+            ),
+            ("omniroute|node.*omniroute", "node", "omniroute (v16.2.12)", true),
+            (
+                "ollama",
+                "ollama",
+                "/Applications/Ollama.app/Contents/Resources/ollama serve",
+                true,
+            ),
+            (
+                "ClashX|clash",
+                "ClashX",
+                "/Applications/ClashX.app/Contents/MacOS/ClashX",
+                true,
+            ),
+        ];
+
+        for (pattern, command, full, expected) in cases {
+            assert_eq!(
+                command_matches(pattern, command, full),
+                *expected,
+                "pattern={pattern} 对 {full} 的判定不符预期"
+            );
+        }
+    }
+
+    /// 拿不到完整命令行时（ps 受限）必须放行，不能把「看不清」当成「不匹配」。
+    #[test]
+    fn unknown_command_line_passes() {
+        assert!(command_matches("AnythingLLM", "python3.13", ""));
+        // 正则写错同样不该把服务判死
+        assert!(command_matches("(unclosed", "python3.13", "whatever"));
     }
 }
