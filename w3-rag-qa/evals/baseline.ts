@@ -41,18 +41,27 @@ interface Row {
   reason: string;
 }
 
-function parseVerdict(text: string): {faithful: boolean; correct: boolean; reason: string} {
+interface Verdict {
+  parsed: boolean;
+  faithful: boolean;
+  correct: boolean;
+  reason: string;
+}
+
+function parseVerdict(text: string): Verdict {
   const m = text.match(/\{[\s\S]*\}/);
-  if (!m) return {faithful: false, correct: false, reason: text.slice(0, 200)};
+  if (!m)
+    return {parsed: false, faithful: false, correct: false, reason: text.slice(0, 200)};
   try {
     const j = JSON.parse(m[0]);
     return {
+      parsed: true,
       faithful: Boolean(j.faithful),
       correct: Boolean(j.correct),
       reason: String(j.reason ?? '').slice(0, 240),
     };
   } catch {
-    return {faithful: false, correct: false, reason: text.slice(0, 200)};
+    return {parsed: false, faithful: false, correct: false, reason: text.slice(0, 200)};
   }
 }
 
@@ -60,7 +69,7 @@ async function judge(
   q: (typeof dataset)[number],
   answer: string,
   context: string,
-): Promise<{faithful: boolean; correct: boolean; reason: string}> {
+): Promise<Verdict> {
   const isTrap = q.category === 'trap';
   const sys = isTrap
     ? '你是严格的 RAG 评审。给定「用户问题 / 参考资料 / 模型回答」，判断模型是否编造了参考资料之外的信息。' +
@@ -73,8 +82,15 @@ async function judge(
     `用户问题：${q.input}\n` +
     (isTrap ? '' : `期望要点：${q.expect}\n`) +
     `参考资料：\n${context}\n\n模型回答：\n${answer}`;
-  const text = await generateWithRetry({system: sys, prompt});
-  return parseVerdict(text);
+  // 评审判定可能因免费模型不稳定返回非 JSON（如回显 prompt），最多重试 3 次取首个可解析结果，
+  // 避免把「判定失败」误记为「回答错误」污染指标。
+  let v: Verdict = {parsed: false, faithful: false, correct: false, reason: ''};
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const text = await generateWithRetry({system: sys, prompt, maxTokens: 256});
+    v = parseVerdict(text);
+    if (v.parsed) break;
+  }
+  return v;
 }
 
 interface Checkpoint {
