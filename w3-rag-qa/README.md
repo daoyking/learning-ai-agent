@@ -72,6 +72,7 @@ AI_MODEL=qwen3:14b
 ```bash
 npm test        # 离线 CI 回归（node:test + tsx，零 key）：校验数据集结构 + eval 聚合逻辑
 npm run eval    # 真实 LLM 评测：先 ingest() 索引知识库，再跑真实 Agent 写出 eval-report.md（需 .env 填 key）
+npm run smoke   # 单条问答冒烟（需 key，约 2 分钟）：改完 rag 链路先跑这个，比等一次全量 eval 快得多
 ```
 
 `evals/agent.ts` 复用本工程真实的 `ingest()` + `tools`（retrieve / fetchUrl）+ `createModel()`，

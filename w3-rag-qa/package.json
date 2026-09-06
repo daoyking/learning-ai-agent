@@ -11,7 +11,8 @@
     "start": "tsx server/index.ts",
     "eval": "tsx evals/run.ts",
     "eval:baseline": "tsx evals/baseline.ts",
-    "test": "node --import tsx --test tests/eval.test.ts"
+    "test": "node --import tsx --test tests/eval.test.ts",
+    "smoke": "tsx smoke.mts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4",
