@@ -134,6 +134,26 @@ Aqua GUI 会话里，拿不到 gui domain 的 bootstrap 权限（读操作如 `l
 2. **Odysseus** — `/api/models` 报 0 是假象，要穿透查 `/api/model-endpoints/{id}/models`
 3. **SearXNG** — 健康接口 200，但 `default_lang` 不对时返回全本地化垃圾结果
 
+### L1 之前还有第 0 级：端口是不是**我们**在听
+
+端口有人在听，不等于我们的服务在听。2026-09-06 实测：8888 被 Unsloth Studio
+（`python3.13`）占着，AnythingLLM 应用根本没启动，LSH 却把它标成「运行中」——
+**假活是被监控器自己伪造出来的**。
+
+manifest 的 `detect.process` 就是为防这个，但此前代码从没读过它（死配置）。
+现已接线：占用者的命令行不匹配 → 记 `port_conflict`、状态**不算** running。
+
+两个容易写错的点：
+
+- `lsof -F c` 只给进程名（`python3.13`、`node`），而 `detect.process` 是照着
+  **完整命令行**写的（`uvicorn app:app`、`dsh( |$)`、`node.*omniroute`），
+  必须用 `ps -ww -o command= -p <pid>` 拿完整命令行才匹配得上
+- **判不了就放行**：ps 不可用或正则写错时返回"匹配"，不能把「看不清」
+  当成「不匹配」—— 误报冲突会让人去查一个不存在的问题
+
+> ⚠️ 受管 shell（AI Agent 的 bash）里 `ps` 被禁（`operation not permitted`），
+> 从这类 shell 启动 LSH 会让该判定静默降级为旧行为。从 Terminal.app / Finder 启动正常。
+
 ### L3 很贵，这是设计约束不是缺陷
 
 L3 会**真的**发请求：ollama 跑一次完整推理、searxng 真搜一次、openclaw 冷启动
@@ -225,7 +245,7 @@ trigger（可观测症状） → diagnose（只读取证） → conclude（带�
 - [ ] launchd 注册：openclaw / dsh 两个 job 仍未加载（需从 LSH 窗口或 Terminal.app 手动 bootstrap）
 - [x] **L3 结果本地持久化** —— 缓存在 localStorage，开窗口直接显示上次结果；每条带 `at` 时间戳，超 30 分钟标「已过期」转琥珀色，附「清除缓存」按钮
 - [x] **L3 进度事件流（V0.9）** —— 后端每跑完一个探针就推 `l3://progress`，前端增量合并：顶部进度条 + `7/14` + 「刚跑完谁」，卡片逐个亮起并标「进行中 n/N」。一次性返回的 2 分钟里只有秒表在动，用户分不清是卡住还是在跑
-- [x] **同期只允许一轮全量 L3** —— `L3_STREAMING` 原子守卫，避免重复点击把 curl/node 子进程翻倍并互相覆盖前端状态
+- [x] **detect.process 接线** —— 此前是死配置：只看端口有人听就判「运行中」，8888 被 Unsloth Studio 占着时把没启动的 AnythingLLM 标成在线。现在校验占用者命令行，不匹配则记冲突、不算 running（7 个服务的正则都用真实命令行校验过）
 
 ---
 
