@@ -726,28 +726,35 @@ pub fn run_l2_probe(service: &str, m: &crate::model::ServiceManifest) -> Result<
     let method = l2.method.as_str();
     let expect_status = l2.expect_status;
     let timeout_ms = l2.timeout_ms.max(1);
-    
-    // 构造 curl 参数
+
+    // 状态码用 -w 追加在响应体之后，这样才能和 body 分离 ——
+    // 否则只看 curl 的 exit code，永远拿不到 HTTP 状态。
+    //
+    // ⚠️ 2026-09-06 修正：此前把 expect_body 当成 `-d` 请求体发出去了。
+    // 它的语义是「响应体需要匹配的正则」，不是请求体（L2 探针没有 body 字段）。
+    // 后果是任何带 expect_body 的 L2 都会发一个莫名 POST，而对响应内容
+    // 一个字都不校验 —— 托管服务那种「所有路径都返回 200 的 SPA 壳」
+    // 会因此稳稳地绿着。这正是本项目要消灭的假活。
+    const MARKER: &str = "\n__LSH_HTTP_STATUS__:";
     let mut args: Vec<String> = vec![
         "--silent".into(),
         "--max-time".into(), timeout_ms.to_string(),
         "-X".into(), method.into(),
+        "-w".into(), format!("{MARKER}%{{http_code}}").into(),
     ];
-    if let Some(body) = &l2.expect_body {
-        args.push("-H".into());
-        args.push("Content-Type: application/json".into());
-        args.push("-d".into());
-        args.push(body.clone());
-    }
     args.push(l2.url.clone());
-    
-    // 用 Command 直接执行，注入 NO_PROXY 避免沙箱代理劫持
+
+    // 用 Command 直接执行，注入 NO_PROXY 避免沙箱代理劫持。
+    // 只豁免环回地址，对远程域名（如托管服务）不影响，仍走系统代理设置。
     let mut command = std::process::Command::new("curl");
     command.env("NO_PROXY", "127.0.0.1,localhost")
         .args(&args.iter().map(|s| s.as_str()).collect::<Vec<_>>())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-    
+
+    // 计时从 spawn 之前开始。此前 t0 放在 curl 结束之后，ms 恒为 0，
+    // 于是「探针耗时 ≈ 声明的 timeout」这个定位超时被砍的信号完全看不到。
+    let t0 = std::time::Instant::now();
     let mut child = command.spawn()
         .map_err(|e| format!("curl 启动失败 [{service}]: {e}"))?;
     
@@ -768,17 +775,39 @@ pub fn run_l2_probe(service: &str, m: &crate::model::ServiceManifest) -> Result<
         }
     };
 
-    let t0 = std::time::Instant::now();
-    let code = out.status.code().unwrap_or(-1);
-    let status = if timed_out { 0 } else { code as u16 };
-    let ok = status == expect_status;
-
     let ms = t0.elapsed().as_millis() as u64;
+
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let (body, code_from_body) = match stdout.rfind(MARKER) {
+        Some(i) => (
+            stdout[..i].to_string(),
+            stdout[i + MARKER.len()..].trim().parse::<u16>().ok(),
+        ),
+        None => (stdout.clone(), None),
+    };
+
+    let status = if timed_out { 0 } else { code_from_body.unwrap_or(0) };
+    let status_ok = status == expect_status;
+
+    // 响应体判据：托管服务最容易在这里露馅 —— 页面壳 200，后端其实已经挂了。
+    let body_ok = match &l2.expect_body {
+        Some(pattern) => match regex::Regex::new(pattern) {
+            Ok(re) => re.is_match(&body),
+            // 正则写错时不因此把服务判死（与 scanner::command_matches 同一策略）
+            Err(_) => true,
+        },
+        None => true,
+    };
+    let ok = status_ok && body_ok;
+
     Ok(serde_json::json!({
         "ok": ok,
         "status": status,
         "expect_status": expect_status,
         "ms": ms,
+        "status_ok": status_ok,
+        "body_ok": body_ok,
+        "body_excerpt": body.chars().take(200).collect::<String>(),
     }))
 }
 
