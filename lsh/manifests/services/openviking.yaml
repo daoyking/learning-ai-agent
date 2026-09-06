@@ -123,7 +123,7 @@ logs:
     path: '~/.openviking/server.err.log'
     label: stderr
 
-playbooks: []
+playbooks: [openviking-semantic-stuck, openviking-path-busy]
 
 danger:
   stop_requires_confirm: true

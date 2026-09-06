@@ -1,0 +1,83 @@
+schema: lsh.playbook/v1
+id: openviking-path-busy
+title: 写入返回 409 path_busy —— 服务忙，不是服务坏
+service: openviking
+severity: warn
+category: resource
+symptom: |
+  add_resource 返回 409 CONFLICT：
+  {"code":"CONFLICT","message":"lock acquire timed out after 0ms",
+   "details":{"conflict_type":"path_busy","retryable":true}}
+
+  注意它自带 retryable: true —— 服务端明确告诉你"我正忙，等会儿再来"。
+  把它当故障处理（查依赖、重启）是白费力气。
+
+trigger:
+  any_of:
+    - log_match:
+        source: openviking/server
+        pattern: 'lock acquire timed out|path_busy|LockAcquisitionError'
+        window: 15m
+        count: 1
+  cooldown_ms: 600000
+
+diagnose:
+  - id: recent-locks
+    title: 确认是锁竞争而不是别的错误
+    exec:
+      cmd: "grep -iE 'path_busy|lock acquire|LockAcquisitionError' '${home}/server.log' | tail -10"
+      timeout_ms: 15000
+    capture: lock_lines
+  - id: in-flight
+    title: 看有没有正在进行的语义处理任务（在做完之前锁不会放）
+    exec:
+      cmd: "grep -E 'Processing semantic generation|Completed semantic generation' '${home}/server.log' | tail -8"
+      timeout_ms: 15000
+    capture: queue_lines
+  - id: alive
+    title: 服务本身还好吗
+    exec:
+      cmd: "curl -s --max-time 8 --noproxy '*' http://127.0.0.1:1933/ready"
+      timeout_ms: 15000
+    capture: ready
+
+conclude:
+  - when: "contains(lock_lines, 'path_busy') or contains(lock_lines, 'lock acquire')"
+    root_cause: |
+      上一批写入/语义处理还没做完，viking:// 路径上的 tree lock 没释放。
+      连续提交（尤其短时间跑多轮探针）必然撞上。
+      服务是健康的（/ready 照常返回 ready），只是这条路径现在进不去。
+    confidence: high
+    evidence:
+      - "server.log：${lock_lines}"
+      - '进行中的任务：${queue_lines}'
+      - '/ready：${ready}'
+    recommended_fix: wait-and-verify
+
+fix:
+  mode: assisted
+  confirm: false
+  backup: []
+  steps:
+    - id: wait-and-verify
+      title: 等 90s 让在途任务做完，再探一次
+      type: exec
+      cmd: "sleep 90 ; curl -s --max-time 10 --noproxy '*' http://127.0.0.1:1933/ready"
+      timeout_ms: 120000
+      snapshot: false
+
+verify:
+  probe: openviking.ready-deps
+  expect: "embedding == 'ok' && ollama == 'ok' && vectordb == 'ok'"
+  timeout_ms: 20000
+  note: |
+    这条只验"服务还活着"，不验"能写入了"。
+    要确认写入恢复，请单独跑一次 openviking.write-recall（3-5 分钟）。
+
+    别急着重启 —— 重启会丢掉队列里在途的任务，之后它们也不会补做。
+    只有"等了 10 分钟仍是 path_busy"才需要从 LSH 卡片 stop/start。
+
+risk: low
+side_effects: none
+requires_sudo: false
+source: '2026-09-06 连跑多轮探针实测'

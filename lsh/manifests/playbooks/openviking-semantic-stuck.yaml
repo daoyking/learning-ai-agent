@@ -1,0 +1,95 @@
+schema: lsh.playbook/v1
+id: openviking-semantic-stuck
+title: 资源写进去了却检索不到 —— VLM 超时，摘要没生成
+service: openviking
+severity: high
+category: resource
+symptom: |
+  /health 返回 200、/ready 全绿（vectordb / embedding / ollama 全是 ok），
+  但刚写入的资源**检索不到**。日志里能看到 APITimeoutError。
+
+  这是 OpenViking 版本的假活：三个部件里每一个都"活着"，
+  串起来的链路却是断的 —— 摘要没生成，资源就进不了索引，
+  于是检索永远查不到它，而健康检查对此一无所知。
+
+trigger:
+  any_of:
+    - probe: openviking.write-recall
+      when: 'hit == false'
+    - log_match:
+        source: openviking/server
+        pattern: 'APITimeoutError|Request timed out'
+        window: 30m
+        count: 1
+  cooldown_ms: 900000
+
+diagnose:
+  - id: recent-errors
+    title: 看语义处理环节有没有报错
+    exec:
+      cmd: "grep -iE 'APITimeoutError|Request timed out|semantic|LockAcquisition' '${home}/server.log' | tail -20"
+      timeout_ms: 15000
+    capture: err_lines
+  - id: vlm-latency
+    title: 直测 VLM 单次调用延迟（瓶颈基本都在这里）
+    exec:
+      cmd: "curl -s --max-time 120 --noproxy '*' http://localhost:11434/v1/chat/completions -H 'content-type: application/json' -d '{\"model\":\"qwen3:14b\",\"messages\":[{\"role\":\"user\",\"content\":\"用一句话总结：本地服务要能自证可用。\"}],\"temperature\":0}' -o /dev/null -w 'vlm_http_code=%{http_code} vlm_seconds=%{time_total}'"
+      timeout_ms: 130000
+    capture: vlm_probe
+    optional: true
+  - id: ollama-resident
+    title: 看模型是否常驻显存（冷加载一次就是几十秒）
+    exec:
+      cmd: "curl -s --max-time 8 --noproxy '*' http://localhost:11434/api/ps | tr ',' '\\n' | grep -E '\"name\"|size_vram' | head -20"
+      timeout_ms: 15000
+    capture: ollama_ps
+    optional: true
+
+conclude:
+  - when: "contains(err_lines, 'APITimeoutError')"
+    root_cause: |
+      VLM 调用超时，L0/L1 摘要没生成 → 资源不进索引 → 检索查不到。
+      本机用的是 14B 模型：一个资源要触发 3 次 VLM（文件摘要 +
+      父目录 .abstract + .overview），单次 40s 起，排队后轻松超过
+      配置里的 vlm.timeout（默认 120s 就不够）。
+    confidence: high
+    evidence:
+      - "server.log：${err_lines}"
+      - 'VLM 实测：${vlm_probe}'
+      - 'Ollama 常驻：${ollama_ps}'
+      - '/ready 全绿但检索为空 —— 健康检查对这条链路是瞎的'
+    recommended_fix: raise-vlm-timeout
+  - when: "contains(err_lines, 'LockAcquisitionError')"
+    root_cause: |
+      不是本剧本的问题 —— 是写入路径被上一批任务占着，
+      锁拿不到所以根本没走到 VLM 那一步。
+    confidence: high
+    evidence:
+      - "server.log：${err_lines}"
+    recommended_fix: openviking-path-busy
+
+fix:
+  mode: assisted
+  confirm: true
+  backup: ['${home}/ov.conf']
+  steps:
+    - id: raise-vlm-timeout
+      title: 把 vlm.timeout 提到 300s 并重启服务
+      type: exec
+      cmd: "python3 -c \"import json,os;p=os.path.expanduser('~/.openviking/ov.conf');d=json.load(open(p));d.setdefault('vlm',{})['timeout']=300;d['vlm'].setdefault('thinking',False);json.dump(d,open(p,'w'),indent=2,ensure_ascii=False);print('vlm.timeout=300 thinking=False')\" && pkill -f 'openviking-server --host 127.0.0.1 --port 1933' ; sleep 3 ; echo '已停止，请从 LSH 卡片点「启动」（start 动作自带 setsid 与 NO_PROXY）'"
+      timeout_ms: 40000
+      snapshot: true
+
+verify:
+  probe: openviking.write-recall
+  expect: 'hit == true'
+  timeout_ms: 450000
+  note: |
+    这条探针本身就要 3-5 分钟（本机 14B），给足耐心。
+    根治办法只有一个：把 VLM 换成小模型（qwen3:4b 量级），
+    否则它永远进不了常规体检 —— manifest 里它就是 enabled: false。
+
+risk: medium
+side_effects: restart-service
+requires_sudo: false
+source: '2026-09-06 本机部署实测'
